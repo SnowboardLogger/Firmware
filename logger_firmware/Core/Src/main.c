@@ -65,6 +65,11 @@ volatile screenStates prevState;
 
 const int BUFFER_SIZE = 100;
 
+double maxSpeed = 0;
+double maxAltitude = 0;
+double longestRun = 0;
+double tallestRun = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -82,8 +87,15 @@ void printScreen(screenStates s, screenStates p);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-volatile gpsData gps_data = {"ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
-	  	  	  0,//bufferIndex
+volatile gpsData gps_data = {
+		  0,
+		  "hh",
+		  0,
+		  "mm",
+		  0,
+		  "ss.ss",
+		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
+	  	  0,//bufferIndex
 		  "lllll.ll",//latitudeChar[]
 		  0,//latitude
 		  'A',//latDir
@@ -109,7 +121,7 @@ gpsData parseGps(gpsData data){
 
 	int dataElementIndex = 0;
 	int dataElementNum = 0;
-	int count = 0;
+	int timeCount = 0;
 
 	char dataType[7] = "XXXXXX";
 
@@ -130,7 +142,35 @@ gpsData parseGps(gpsData data){
 
 		if(strcmp(dataType,"$GPGGA") == 0 && letter != ','){
 			if (dataElementNum == 1 ){
-				//This is the UTC (time) if we need it
+
+				if (timeCount <= 1){
+					data.hoursChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if(timeCount == 1){
+						data.hours = atoi(data.hoursChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount <= 3){
+					data.minsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (timeCount == 3){
+						data.mins = atoi(data.minsChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount > 3){
+					data.secsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (*(data.dataBuffer+i+1) == ','){
+						data.secs = atof(data.secsChar);
+						dataElementIndex = 0;
+					}
+
+				}
+
+				++timeCount;
+
 			} else if (dataElementNum == 2 ){
 				data.latitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
@@ -193,12 +233,24 @@ gpsData parseGps(gpsData data){
 					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
 				}
 
-			} else {
+			} else if(dataElementNum >= 8){
 				break;
 			}		}
-		++count;
+
 	}
 	return data;
+}
+
+void determineMax(gpsData data){
+	if(data.speedMph > maxSpeed){
+		maxSpeed = data.speedMph;
+	}
+
+	if(data.altitude > maxAltitude){
+		maxAltitude = data.altitude;
+	}
+
+
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -283,16 +335,24 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
 
-	  gps_data = parseGps(gps_data);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	//if(isLogging){
+	  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
+
+	  gps_data = parseGps(gps_data);
+	  determineMax(gps_data);
+	//}
+
 	printScreen(state, prevState);
 
 	btSendData("hello world\r\n", sizeof("hello world\r\n"));
 
+	printf("Time: %u:%u:%f | ", gps_data.hours, gps_data.mins, gps_data.secs);
 	printf("Latitude: %f", gps_data.latitude);
 	printf(" %c", gps_data.latDir);
 	printf(" | Longitude: %f", gps_data.longitude);
@@ -571,9 +631,13 @@ static void MX_GPIO_Init(void)
 	// LCD Functions
 	void printScreen(screenStates s, screenStates p) {
 		HD44780_SetCursor(0, 0);
+		char temp[16];
 		switch(s) {
 			case speed: {
 				HD44780_PrintStr("Max Speed (m/s):");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", maxSpeed);
+				HD44780_PrintStr(temp);
 				break; }
 			case alt: {
 				HD44780_PrintStr("Max Alt. (m):   ");

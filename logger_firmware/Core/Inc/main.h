@@ -37,6 +37,13 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 typedef struct {
+	int hours;
+	char hoursChar[8];
+	int mins;
+	char minsChar[8];
+	double secs;
+	char secsChar[8];
+
 	volatile char dataBuffer[100];//max chars of 70 from gpgga
 	volatile int bufferIndex;
 
