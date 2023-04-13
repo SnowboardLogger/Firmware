@@ -641,6 +641,9 @@ static void MX_GPIO_Init(void)
 				break; }
 			case alt: {
 				HD44780_PrintStr("Max Alt. (m):   ");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", maxAltitude);
+				HD44780_PrintStr(temp);
 				break; }
 			case longest: {
 				HD44780_PrintStr("Longest Run (m):");
