@@ -326,6 +326,10 @@ int main(void)
 	char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
 	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
+	//Change GPS update frequency to every 3000 milliseconds
+	char inputBuffer[] = "$PMTK220,3000*1F\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+
 
 	bytesReceived = 0;
 
