@@ -23,6 +23,10 @@
 /* USER CODE BEGIN Includes */
 
 #include "liquidcrystal_i2c.h"
+#include "stdlib.h"
+#include "stdio.h"
+#include <string.h>
+#include "stm32l4xx_hal_uart.h"
 
 /* USER CODE END Includes */
 
@@ -44,6 +48,7 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -52,6 +57,19 @@ volatile screenStates state = speed;
 volatile uint8_t isLogging = 0;
 volatile screenStates prevState;
 
+#define USART1_ADDR = 0x40013800
+#define USART1_CR1_OFFSET = 0x0
+#define USART1_BRR _OFFSET = 0xC
+#define USART1_CR2_OFFSET = 0x4
+#define USART1_CR3_OFFSET = 0x8
+
+const int BUFFER_SIZE = 100;
+
+double maxSpeed = 0;
+double maxAltitude = 0;
+double longestRun = 0;
+double tallestRun = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -59,6 +77,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 void btSendData(uint8_t str[], uint32_t size);
@@ -68,7 +87,198 @@ void printScreen(screenStates s, screenStates p);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+volatile gpsData gps_data = {
+		  0,
+		  "hh",
+		  0,
+		  "mm",
+		  0,
+		  "ss.ss",
+		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
+	  	  0,//bufferIndex
+		  "lllll.ll",//latitudeChar[]
+		  0,//latitude
+		  'A',//latDir
+		  "yyyyy.yy",//longitudeChar
+		  0,//longitude
+		  'A',//longDir
+		  0,//fix
+		  0,//numSatellites
+		  "xxx",//numSatellitesChar
+		  0,//hdop
+		  "x.x",//hdopChar[]
+		  0,//altitude
+		  "x.x",//altitudeChar[]
+		  'M',//altitudeUnits
+		  'V',//validity
+		  "xxx",//speedCharKnots
+		  0, //speedMph
+			};
+uint8_t bytesReceived;
+volatile char bufferByte[1];
 
+gpsData parseGps(gpsData data){
+
+	int dataElementIndex = 0;
+	int dataElementNum = 0;
+	int timeCount = 0;
+
+	char dataType[7] = "XXXXXX";
+
+	for(uint8_t i = 0; i < BUFFER_SIZE; ++i){
+		char letter = *(data.dataBuffer+i);
+
+		if(letter == ','){
+			++dataElementNum;
+			dataElementIndex = 0;
+		}
+
+		if(dataElementNum == 0 && letter != ','){
+			//datatype, either GPGGA or GPRMC
+			dataType[dataElementIndex] = letter;
+			++dataElementIndex;
+		}
+
+
+		if(strcmp(dataType,"$GPGGA") == 0 && letter != ','){
+			if (dataElementNum == 1 ){
+
+				if (timeCount <= 1){
+					data.hoursChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if(timeCount == 1){
+						data.hours = atoi(data.hoursChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount <= 3){
+					data.minsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (timeCount == 3){
+						data.mins = atoi(data.minsChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount > 3){
+					data.secsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (*(data.dataBuffer+i+1) == ','){
+						data.secs = atof(data.secsChar);
+						dataElementIndex = 0;
+					}
+
+				}
+
+				++timeCount;
+
+			} else if (dataElementNum == 2 ){
+				data.latitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.latitude = atof(data.latitudeChar);
+				}
+
+			} else if (dataElementNum == 3){
+				data.latDir = letter;
+
+			} else if (dataElementNum == 4){
+				data.longitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.longitude = atof(data.longitudeChar);
+				}
+
+			} else if (dataElementNum == 5){
+				data.longDir = letter;
+
+			} else if (dataElementNum == 6){
+				data.fix = (uint8_t) (letter - '0');
+
+			} else if (dataElementNum == 7){
+				data.numSatellitesChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.numSatellites = atoi(data.numSatellitesChar);
+				}
+
+			} else if (dataElementNum == 8){
+				data.hdopChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.hdop = atof(data.hdopChar);
+				}
+
+			} else if (dataElementNum == 9){
+				data.altitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.altitude = atof(data.altitudeChar);
+				}
+
+			} else if (dataElementNum == 10){
+				data.altitudeUnits = letter;
+
+			} else if (dataElementNum == 11){
+				break;
+			}
+
+		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
+			if (dataElementNum == 2){
+				data.validity = letter;
+
+			} else if (dataElementNum == 7){
+				data.speedCharKnots[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
+				}
+
+			} else if(dataElementNum >= 8){
+				break;
+			}		}
+
+	}
+	return data;
+}
+
+void determineMax(gpsData data){
+	if(data.speedMph > maxSpeed){
+		maxSpeed = data.speedMph;
+	}
+
+	if(data.altitude > maxAltitude){
+		maxAltitude = data.altitude;
+	}
+
+
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+
+
+	//if(data.dataBuffer[data.bufferIndex] != '/n'){
+
+		if (gps_data.bufferIndex < BUFFER_SIZE){
+			gps_data.dataBuffer[gps_data.bufferIndex++] = *bufferByte;
+
+		} else{
+			gps_data.bufferIndex = 0;
+
+		}
+
+		if(*bufferByte == '\n'){
+			gps_data.bufferIndex = 0;
+
+		}
+
+		HAL_UART_Receive_IT(huart, (uint8_t *) bufferByte, 1);
+
+	//}
+
+
+	//++bytesReceived;
+}
 /* USER CODE END 0 */
 
 /**
@@ -101,6 +311,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   // Initialize LCD
@@ -110,6 +321,13 @@ int main(void)
   HD44780_NoBlink(); // Don't blink cursor
   HD44780_NoCursor(); // Don't show cursor
 
+  //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
+	//data on the GPS
+	char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+
+
+	bytesReceived = 0;
 
   /* USER CODE END 2 */
 
@@ -117,12 +335,36 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	//if(isLogging){
+	  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
+
+	  gps_data = parseGps(gps_data);
+	  determineMax(gps_data);
+	//}
+
 	printScreen(state, prevState);
 
 	btSendData("hello world\r\n", sizeof("hello world\r\n"));
+
+	printf("Time: %u:%u:%f | ", gps_data.hours, gps_data.mins, gps_data.secs);
+	printf("Latitude: %f", gps_data.latitude);
+	printf(" %c", gps_data.latDir);
+	printf(" | Longitude: %f", gps_data.longitude);
+	printf(" %c", gps_data.longDir);
+	printf(" | GPS fix?: %u", gps_data.fix);
+	printf(" | Satellites: %u", gps_data.numSatellites);
+	printf(" | HDOP: %f", gps_data.hdop);
+	printf(" | altitude: %f", gps_data.altitude);
+	printf(" %c", gps_data.altitudeUnits);
+	printf(" | Validity: %c", gps_data.validity);
+	printf(" | Speed: %f", gps_data.speedMph);
+	printf("\n");
   }
   /* USER CODE END 3 */
 }
@@ -226,6 +468,41 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -279,6 +556,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_GPIO_Port, LED_GPIO_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pins : SD_SPI_SCK_Pin SD_SPI_MISO_Pin SD_SPI_MOSI_Pin */
   GPIO_InitStruct.Pin = SD_SPI_SCK_Pin|SD_SPI_MISO_Pin|SD_SPI_MOSI_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -292,14 +575,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(QiEnable_GPIO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : GPS_UART_TX_Pin GPS_UART_RX_Pin */
-  GPIO_InitStruct.Pin = GPS_UART_TX_Pin|GPS_UART_RX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Button_GPIO_Pin */
   GPIO_InitStruct.Pin = Button_GPIO_Pin;
@@ -335,6 +610,17 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+	//Enable printf
+	#ifdef __GNUC__
+	#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+	#else
+	  #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+	#endif /* __GNUC__ */
+	PUTCHAR_PROTOTYPE
+	{
+	  HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xFFFF);
+	  return ch;
+	}
 
 	// Blue tooth Functions
 	void btSendData(uint8_t str[], uint32_t size) {
@@ -345,12 +631,19 @@ static void MX_GPIO_Init(void)
 	// LCD Functions
 	void printScreen(screenStates s, screenStates p) {
 		HD44780_SetCursor(0, 0);
+		char temp[16];
 		switch(s) {
 			case speed: {
 				HD44780_PrintStr("Max Speed (m/s):");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", maxSpeed);
+				HD44780_PrintStr(temp);
 				break; }
 			case alt: {
 				HD44780_PrintStr("Max Alt. (m):   ");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", maxAltitude);
+				HD44780_PrintStr(temp);
 				break; }
 			case longest: {
 				HD44780_PrintStr("Longest Run (m):");
