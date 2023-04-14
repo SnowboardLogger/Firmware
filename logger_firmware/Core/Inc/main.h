@@ -41,19 +41,20 @@ typedef struct {
 	char hoursChar[8];
 	int mins;
 	char minsChar[8];
-	double secs;
+	float secs;
 	char secsChar[8];
+	float timeInSecs;
 
 	volatile char dataBuffer[100];//max chars of 70 from gpgga
 	volatile int bufferIndex;
 
 	char latitudeChar[15];
-	double latitude;
+	float latitude;
 
 	char latDir;//N or S
 
 	char longitudeChar[15];
-	double longitude;
+	float longitude;
 
 	char longDir;//E or W
 
@@ -62,10 +63,10 @@ typedef struct {
 	uint8_t numSatellites;
 	char numSatellitesChar[6];
 
-	double hdop;//Horizontal Dilution of Precision
+	float hdop;//Horizontal Dilution of Precision
 	char hdopChar[8];
 
-	double altitude;
+	float altitude;
 	char altitudeChar[8];
 
 	char altitudeUnits;//M = meters
@@ -74,8 +75,20 @@ typedef struct {
 	char validity;
 
 	char speedCharKnots[10];
-	double speedMph;
+	float speedMph;
 }gpsData;
+
+typedef struct {
+
+	float startLat;
+	float startLong;
+	float startAlt;
+
+	float stopLat;
+	float stopLong;
+	float stopAlt;
+
+} runData;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -85,6 +98,12 @@ typedef struct {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+
+typedef enum {
+	running,
+	notRunning
+} runStates;
+
 typedef enum {
 	speed,
 	alt,

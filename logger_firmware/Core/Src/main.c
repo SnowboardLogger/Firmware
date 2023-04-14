@@ -117,6 +117,11 @@ volatile gpsData gps_data = {
 uint8_t bytesReceived;
 volatile char bufferByte[1];
 
+runData run_data = {
+	0,0,0,//start lat, long, alt
+	0,0,0 //stop lat, long, alt
+};
+
 gpsData parseGps(gpsData data){
 
 	int dataElementIndex = 0;
@@ -165,6 +170,7 @@ gpsData parseGps(gpsData data){
 					if (*(data.dataBuffer+i+1) == ','){
 						data.secs = atof(data.secsChar);
 						dataElementIndex = 0;
+						data.timeInSecs = data.secs + (data.mins * 60) + (data.hours * 24 * 60);
 					}
 
 				}
@@ -235,10 +241,16 @@ gpsData parseGps(gpsData data){
 
 			} else if(dataElementNum >= 8){
 				break;
-			}		}
+			}
+		}
 
 	}
 	return data;
+}
+
+float calcDistance(float lat1, float long1, float lat2, float long2){
+
+
 }
 
 void determineMax(gpsData data){
@@ -250,6 +262,15 @@ void determineMax(gpsData data){
 		maxAltitude = data.altitude;
 	}
 
+	float runLength = calcDistance(run_data.startLat,run_data.startLong,run_data.stopLat,run_data.stopLong);
+	if(runLength > longestRun){
+		longestRun = runLength;
+	}
+
+	float runHeight = run_data.startAlt - run_data.stopAlt;
+	if(runHeight > tallestRun){
+		tallestRun = runHeight;
+	}
 
 }
 
@@ -278,6 +299,50 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 
 	//++bytesReceived;
+}
+
+runStates runStatus;
+float runStartTimeInSecs;
+float stopStartTimeInSecs;
+//int firstTimeOver;
+const float THRESHOLD_SPEED = 3.0;
+
+void checkRunStatus(gpsData data){
+
+	if(runStatus == running && data.speedMph <= THRESHOLD_SPEED){
+		if(firstTimeOver == 0){
+			//Keep track of the time when we first stopped
+			stopStartTimeInSecs = data.timeInSecs;
+			++firstTimeOver;
+		}
+
+		//Stopped for 15 seconds
+		if(data.timeInSecs - stopStartTimeInSecs >= 15){
+			runStatus = notRunning;
+		}
+
+	} else if(runStatus == running && data.speedMph > THRESHOLD_SPEED){
+		firstTimeOver = 0;
+		//Moving right now so reset firstTimeOver because we didn't stay in place for 15 secs
+	}
+
+	if(runStatus == notRunning && data.speedMph > THRESHOLD_SPEED){
+		if(firstTimeOver == 0){
+			//Keep track of the time when we first started moving
+			runStartTimeInSecs = data.timeInSecs;
+			++firstTimeOver;
+		}
+
+		//Moving for 7 seconds
+		if(data.timeInSecs - runStartTimeInSecs >= 7){
+			runStatus = notRunning;
+		}
+
+	} else if(runStatus == notRunning && data.speedMph <= THRESHOLD_SPEED){
+		firstTimeOver = 0;
+		//Stopped right now so reset firstTimeOver
+	}
+
 }
 /* USER CODE END 0 */
 
@@ -323,16 +388,18 @@ int main(void)
 
   //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
 	//data on the GPS
-	char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
+	char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C\r\n";
 	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
 	//Change GPS update frequency to every 3000 milliseconds
 	char inputBuffer[] = "$PMTK220,3000*1F\r\n";
 	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
-
 	bytesReceived = 0;
 
+	runStatus = notRunning;
+	startTimeInSecs = 0;
+	//firstTimeOver = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -349,7 +416,12 @@ int main(void)
 	  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
 
 	  gps_data = parseGps(gps_data);
+
+	  checkRunStatus(gps_data);
+
 	  determineMax(gps_data);
+
+
 	//}
 
 	printScreen(state, prevState);
