@@ -330,7 +330,7 @@ void checkRunStatus(gpsData data){
 		//Moving right now so reset firstTimeOver because we didn't stay in place for 15 secs
 	}
 
-	if(runStatus == notRunning && data.speedMph > THRESHOLD_SPEED){
+	if((runStatus == notRunning && data.speedMph > THRESHOLD_SPEED) || (data.speedMph >= 15)){
 		if(firstTimeOver == 0){
 			//Keep track of the time when we first started moving
 			runStartTimeInSecs = data.timeInSecs;
@@ -338,7 +338,7 @@ void checkRunStatus(gpsData data){
 		}
 
 		//Moving for 7 seconds
-		if(data.timeInSecs - runStartTimeInSecs >= 7){
+		if(data.timeInSecs - runStartTimeInSecs >= 7 || (data.speedMph >= 15)){
 			run_data.startAlt = gps_data.altitude;
 			run_data.startLat = gps_data.latitude;
 			run_data.startLong = gps_data.longitude;
