@@ -27,6 +27,7 @@
 #include "stdio.h"
 #include <string.h>
 #include "stm32l4xx_hal_uart.h"
+#include <math.h>
 
 /* USER CODE END Includes */
 
@@ -65,10 +66,10 @@ volatile screenStates prevState;
 
 const int BUFFER_SIZE = 100;
 
-double maxSpeed = 0;
-double maxAltitude = 0;
-double longestRun = 0;
-double tallestRun = 0;
+float maxSpeed = 0;
+float maxAltitude = 0;
+float longestRun = 0;
+float tallestRun = 0;
 
 runStates runStatus;
 float runStartTimeInSecs;
@@ -120,6 +121,8 @@ volatile gpsData gps_data = {
 		  'V',//validity
 		  "xxx",//speedCharKnots
 		  0, //speedMph
+		  "0",//checksum
+		  0//dataGood
 			};
 uint8_t bytesReceived;
 volatile char bufferByte[1];
@@ -128,6 +131,24 @@ runData run_data = {
 	0,0,0,//start lat, long, alt
 	0,0,0 //stop lat, long, alt
 };
+
+uint16_t calcCheckSum(gpsData *data){
+	int i = 0;
+	char letter = *(data->dataBuffer);
+	uint16_t sum = 0;
+
+	while(letter != '*'){
+
+		letter = *(data->dataBuffer+i);
+
+		if(letter != '$' && letter != '*'){
+			sum = sum ^ letter;
+		}
+
+		++i;
+	}
+	return sum;
+}
 
 gpsData parseGps(gpsData data){
 
@@ -141,6 +162,11 @@ gpsData parseGps(gpsData data){
 		char letter = *(data.dataBuffer+i);
 
 		if(letter == ','){
+			++dataElementNum;
+			dataElementIndex = 0;
+		}
+
+		if(letter == '\n'){
 			++dataElementNum;
 			dataElementIndex = 0;
 		}
@@ -231,14 +257,39 @@ gpsData parseGps(gpsData data){
 				data.altitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.altitude = atof(data.altitudeChar);
+					float alt = atof(data.altitudeChar);
+
+					//Either we are on a plane or this is wrong because mt everest is 8849 M tall rn
+					if(alt <= 8900){
+						data.altitude = alt;
+					}else {
+						data.altitude = -1;
+					}
 				}
 
 			} else if (dataElementNum == 10){
 				data.altitudeUnits = letter;
 
-			} else if (dataElementNum == 11){
-				break;
+			} else if (dataElementNum == 15){
+
+				//ignore the N and *
+				if(dataElementIndex >=2){
+					data.checksum[dataElementIndex] = letter;
+				}
+				++dataElementIndex;
+
+
+				if(dataElementIndex == 3){
+					uint16_t check = calcCheckSum(&data);
+
+					if((uint16_t) data.checksum == check){
+						//data is good
+						data.dataGood = 1;
+					}else {
+						data.dataGood = 0;
+					}
+
+				}
 			}
 
 		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
@@ -249,10 +300,22 @@ gpsData parseGps(gpsData data){
 				data.speedCharKnots[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
+					float speed = 1.15077945 * atof(data.speedCharKnots);
+
+					//Either we are on a plane or this is wrong because the land speed record is 1200mph
+					if(speed <= 1200){
+						data.speedMph = speed;
+					}else {
+						data.speedMph = -1;
+					}
+
 				}
 
 			} else if(dataElementNum >= 8){
+				break;
+			}
+
+			if(letter == '\n'){
 				break;
 			}
 		}
@@ -262,7 +325,16 @@ gpsData parseGps(gpsData data){
 }
 
 float calcDistance(float lat1, float long1, float lat2, float long2){
-	return 2.0;
+	int R = 6371000;
+	float phi1 = lat1 * M_PI/180;
+	float phi2 = lat2 * M_PI/180;
+	float delPhi = (lat2-lat1) * M_PI/180;
+	float delLam = (long2-long1) * M_PI/180;
+
+	float a = (sin(delPhi/2)*sin(delPhi/2)) + (cos(phi1)*cos(phi2)*sin(delLam/2)*sin(delLam/2));
+	float c = 2 * atan2(sqrt(a), sqrt(1-a));
+
+	return R * c;
 
 }
 
@@ -293,20 +365,23 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	//if(data.dataBuffer[data.bufferIndex] != '/n'){
 
-		if (gps_data.bufferIndex < BUFFER_SIZE){
+		//if (gps_data.bufferIndex < BUFFER_SIZE){
 			gps_data.dataBuffer[gps_data.bufferIndex++] = *bufferByte;
 
-		} else{
+		/*} else{
 			gps_data.bufferIndex = 0;
 
-		}
+		}*/
 
 		if(*bufferByte == '\n'){
 			gps_data.bufferIndex = 0;
 
+		}else {
+			HAL_UART_Receive_IT(huart, (uint8_t *) bufferByte, 1);
+
 		}
 
-		HAL_UART_Receive_IT(huart, (uint8_t *) bufferByte, 1);
+
 
 	//}
 
@@ -468,6 +543,7 @@ int main(void)
 	printf(" %c", gps_data.altitudeUnits);
 	printf(" | Validity: %c", gps_data.validity);
 	printf(" | Speed: %f", gps_data.speedMph);
+	printf(" | dataGood: %u", gps_data.dataGood);
 	printf("\n");
   }
   /* USER CODE END 3 */
@@ -738,7 +814,7 @@ static void MX_GPIO_Init(void)
 		char temp[16];
 		switch(s) {
 			case speed: {
-				HD44780_PrintStr("Max Speed (m/s):");
+				HD44780_PrintStr("Max Speed (mph):");
 				HD44780_SetCursor(1, 0);
 				sprintf(temp, "%f", maxSpeed);
 				HD44780_PrintStr(temp);

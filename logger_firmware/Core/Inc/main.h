@@ -76,6 +76,9 @@ typedef struct {
 
 	char speedCharKnots[10];
 	float speedMph;
+
+	char checksum[6];
+	int dataGood;
 }gpsData;
 
 typedef struct {
