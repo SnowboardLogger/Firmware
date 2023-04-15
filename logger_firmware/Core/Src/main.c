@@ -70,6 +70,12 @@ double maxAltitude = 0;
 double longestRun = 0;
 double tallestRun = 0;
 
+runStates runStatus;
+float runStartTimeInSecs;
+float stopStartTimeInSecs;
+int firstTimeOver;
+const float THRESHOLD_SPEED = 3.0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,6 +100,7 @@ volatile gpsData gps_data = {
 		  "mm",
 		  0,
 		  "ss.ss",
+		  0,
 		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
 	  	  0,//bufferIndex
 		  "lllll.ll",//latitudeChar[]
@@ -236,7 +243,7 @@ gpsData parseGps(gpsData data){
 				data.speedCharKnots[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
+					data.speedMph = atof(data.speedCharKnots);//1.15077945 * atof(data.speedCharKnots);
 				}
 
 			} else if(dataElementNum >= 8){
@@ -249,7 +256,7 @@ gpsData parseGps(gpsData data){
 }
 
 float calcDistance(float lat1, float long1, float lat2, float long2){
-
+	return 2.0;
 
 }
 
@@ -263,12 +270,12 @@ void determineMax(gpsData data){
 	}
 
 	float runLength = calcDistance(run_data.startLat,run_data.startLong,run_data.stopLat,run_data.stopLong);
-	if(runLength > longestRun){
+	if(runLength > longestRun && runStatus == notRunning){
 		longestRun = runLength;
 	}
 
 	float runHeight = run_data.startAlt - run_data.stopAlt;
-	if(runHeight > tallestRun){
+	if(runHeight > tallestRun && runStatus == notRunning){
 		tallestRun = runHeight;
 	}
 
@@ -301,12 +308,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	//++bytesReceived;
 }
 
-runStates runStatus;
-float runStartTimeInSecs;
-float stopStartTimeInSecs;
-//int firstTimeOver;
-const float THRESHOLD_SPEED = 3.0;
-
 void checkRunStatus(gpsData data){
 
 	if(runStatus == running && data.speedMph <= THRESHOLD_SPEED){
@@ -318,6 +319,9 @@ void checkRunStatus(gpsData data){
 
 		//Stopped for 15 seconds
 		if(data.timeInSecs - stopStartTimeInSecs >= 15){
+			run_data.stopAlt = gps_data.altitude;
+			run_data.stopLat = gps_data.latitude;
+			run_data.stopLong = gps_data.longitude;
 			runStatus = notRunning;
 		}
 
@@ -335,7 +339,10 @@ void checkRunStatus(gpsData data){
 
 		//Moving for 7 seconds
 		if(data.timeInSecs - runStartTimeInSecs >= 7){
-			runStatus = notRunning;
+			run_data.startAlt = gps_data.altitude;
+			run_data.startLat = gps_data.latitude;
+			run_data.startLong = gps_data.longitude;
+			runStatus = running;
 		}
 
 	} else if(runStatus == notRunning && data.speedMph <= THRESHOLD_SPEED){
@@ -392,14 +399,15 @@ int main(void)
 	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
 	//Change GPS update frequency to every 3000 milliseconds
-	char inputBuffer[] = "$PMTK220,3000*1F\r\n";
-	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+	char inputBuffer2[] = "$PMTK220,3000*1F\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer), 100);
 
 	bytesReceived = 0;
 
 	runStatus = notRunning;
-	startTimeInSecs = 0;
-	//firstTimeOver = 0;
+	runStartTimeInSecs = 0;
+	stopStartTimeInSecs = 0;
+	firstTimeOver = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -723,9 +731,15 @@ static void MX_GPIO_Init(void)
 				break; }
 			case longest: {
 				HD44780_PrintStr("Longest Run (m):");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", longestRun);
+				HD44780_PrintStr(temp);
 				break; }
 			case tallest: {
 				HD44780_PrintStr("Tallest Run (m):");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", tallestRun);
+				HD44780_PrintStr(temp);
 				break; }
 			case startLog: {
 				HD44780_PrintStr("Starting log:   ");
