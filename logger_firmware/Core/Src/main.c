@@ -1,542 +1,577 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
-#include "main.h"
-#include "fatfs.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 #include "driver.h"
-#include "liquidcrystal_i2c.h"
-#include "stdlib.h"
-#include "stdio.h"
-#include <string.h>
-#include "stm32l4xx_hal_uart.h"
-#include "math.h"
 
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
-SPI_HandleTypeDef hspi1;
-
-TIM_HandleTypeDef htim16;
-
-UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart2;
-
-/* USER CODE BEGIN PV */
-screenStates state = speed;
-screenStates prevState;
-volatile uint8_t isLogging = 0;
-uint8_t bytesReceived;
-volatile char bufferByte[1];
-// Will store upto ten logs
-Log recordedData[10];
-// Booleans for Timer Values
-volatile uint8_t buzEnable = 0;
-volatile uint8_t IMU_DATA_FLAG = 0;
-
-volatile gpsData GPSData = {
-		  0,
-		  "hh",
-		  0,
-		  "mm",
-		  0,
-		  "ss.ss",
-		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
-	  	  0,//bufferIndex
-		  "lllll.ll",//latitudeChar[]
-		  0,//latitude
-		  'A',//latDir
-		  "yyyyy.yy",//longitudeChar
-		  0,//longitude
-		  'A',//longDir
-		  0,//fix
-		  0,//numSatellites
-		  "xxx",//numSatellitesChar
-		  0,//hdop
-		  "x.x",//hdopChar[]
-		  0,//altitude
-		  "x.x",//altitudeChar[]
-		  'M',//altitudeUnits
-		  'V',//validity
-		  "xxx",//speedCharKnots
-		  0, //speedMph
-};
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_TIM16_Init(void);
-static void MX_SPI1_Init(void);
-/* USER CODE BEGIN PFP */
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_I2C1_Init();
-  MX_USART1_UART_Init();
-  MX_TIM16_Init();
-  MX_FATFS_Init();
-  MX_SPI1_Init();
-  /* USER CODE BEGIN 2 */
-
-  // Initialize Timer Interrupt
-  HAL_TIM_Base_Start_IT(&htim16);
-
-  // Initialize LCD
-  HD44780_Init(2); // Initialize
-  HD44780_Clear(); // Clear buffer
-  HD44780_Display(); // Display characters
-  HD44780_NoBlink(); // Don't blink cursor
-  HD44780_NoCursor(); // Don't show cursor
-
-  //enable GGA for GPS (contains the precision data) and RMC (contains all the minimum navigation info)
-  char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
-  HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
-  bytesReceived = 0;
-
-  uint8_t curLog, curRun, curDataPoint;
-
-  // Will listen for an interrupt on this pin
-  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
-}
-
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  /** Configure the main internal regulator output voltage
-  */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 16;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00707CBB;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Analogue filter
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Digital filter
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_HARD_INPUT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief TIM16 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM16_Init(void)
-{
-
-  /* USER CODE BEGIN TIM16_Init 0 */
-
-  /* USER CODE END TIM16_Init 0 */
-
-  /* USER CODE BEGIN TIM16_Init 1 */
-
-  /* USER CODE END TIM16_Init 1 */
-  htim16.Instance = TIM16;
-  htim16.Init.Prescaler = 79;
-  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 199;
-  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim16.Init.RepetitionCounter = 0;
-  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM16_Init 2 */
-
-  /* USER CODE END TIM16_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GPIO_GPIO_Port, LED_GPIO_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : QiEnable_GPIO_Pin */
-  GPIO_InitStruct.Pin = QiEnable_GPIO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(QiEnable_GPIO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Button_GPIO_Pin */
-  GPIO_InitStruct.Pin = Button_GPIO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Button_GPIO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LED_GPIO_Pin */
-  GPIO_InitStruct.Pin = LED_GPIO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_GPIO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : Button_GPIOB4_Pin Button_GPIOB5_Pin */
-  GPIO_InitStruct.Pin = Button_GPIOB4_Pin|Button_GPIOB5_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
-}
-
-/* USER CODE BEGIN 4 */
-	//Enable printf
-	#ifdef __GNUC__
-	#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-	#else
-	  #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-	#endif /* __GNUC__ */
-	PUTCHAR_PROTOTYPE
-	{
-	  HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xFFFF);
-	  return ch;
+void btnFourIRQ(screenStates* state, screenStates* prevState) {
+
+	switch(*state) {
+		case speed:
+			*prevState = *state;
+			*state = alt;
+			break;
+		case alt:
+			*prevState = *state;
+			*state = longest;
+			break;
+		case longest:
+			*prevState = *state;
+			*state = tallest;
+			break;
+		case tallest:
+			*prevState = *state;
+			*state = speed;
+			break;
+		case startLog:
+			*state = *prevState;
+			break;
+		case stopLog:
+			*state = *prevState;
+			break;
+		case pauseLog:
+			break;
+		case resumeLog:
+			*state = *prevState;
+			break;
+		case save:
+			break;
+		case battery:
+			*state = *prevState;
+			break;
+		default:
+			*prevState = *state;
+			*state = error;
+			break;
 	}
-/* USER CODE END 4 */
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+	switch(*state) {
+		case speed:
+		case alt:
+		case longest:
+		case tallest:
+			*prevState = *state;
+			*state = isLogging ? stopLog : startLog;
+			break;
+		case startLog:
+			isLogging = 1;
+			break;
+		case stopLog:
+			isLogging = 0;
+			break;
+		case pauseLog:
+		case resumeLog:
+			isLogging = 0;
+			*state = stopLog;
+			break;
+		case save:
+			break;
+		case battery:
+			*state = isLogging ? stopLog : startLog;
+			break;
+		default:
+			break;
+	}
 }
-#endif /* USE_FULL_ASSERT */
+
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+	switch(*state) {
+		case speed:
+		case alt:
+		case longest:
+		case tallest:
+			*state = isLogging ? pauseLog : battery;
+			break;
+		case startLog:
+			*state = pauseLog;
+			break;
+		case stopLog:
+			*state = *prevState;
+			break;
+		case pauseLog:
+			*state = resumeLog;
+			break;
+		case resumeLog:
+			*state = *prevState;
+			break;
+		case save:
+			break;
+		case battery:
+			break;
+		default:
+			break;
+	}
+}
+
+gpsData parseGps(gpsData data){
+
+	int dataElementIndex = 0;
+	int dataElementNum = 0;
+	int timeCount = 0;
+
+	char dataType[7] = "XXXXXX";
+
+	for(uint8_t i = 0; i < BUFFER_SIZE; ++i){
+		char letter = *(data.dataBuffer+i);
+
+		if(letter == ','){
+			++dataElementNum;
+			dataElementIndex = 0;
+		}
+
+		if(dataElementNum == 0 && letter != ','){
+			//datatype, either GPGGA or GPRMC
+			dataType[dataElementIndex] = letter;
+			++dataElementIndex;
+		}
+
+
+		if(strcmp(dataType,"$GPGGA") == 0 && letter != ','){
+			if (dataElementNum == 1 ){
+
+				if (timeCount <= 1){
+					data.hoursChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if(timeCount == 1){
+						data.hours = atoi(data.hoursChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount <= 3){
+					data.minsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (timeCount == 3){
+						data.mins = atoi(data.minsChar);
+						dataElementIndex = 0;
+					}
+
+				}else if(timeCount > 3){
+					data.secsChar[dataElementIndex] = letter;
+					++dataElementIndex;
+					if (*(data.dataBuffer+i+1) == ','){
+						data.secs = atof(data.secsChar);
+						dataElementIndex = 0;
+					}
+
+				}
+
+				++timeCount;
+
+			} else if (dataElementNum == 2 ){
+				data.latitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.latitude = atof(data.latitudeChar);
+				}
+
+			} else if (dataElementNum == 3){
+				data.latDir = letter;
+
+			} else if (dataElementNum == 4){
+				data.longitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.longitude = atof(data.longitudeChar);
+				}
+
+			} else if (dataElementNum == 5){
+				data.longDir = letter;
+
+			} else if (dataElementNum == 6){
+				data.fix = (uint8_t) (letter - '0');
+
+			} else if (dataElementNum == 7){
+				data.numSatellitesChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.numSatellites = atoi(data.numSatellitesChar);
+				}
+
+			} else if (dataElementNum == 8){
+				data.hdopChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.hdop = atof(data.hdopChar);
+				}
+
+			} else if (dataElementNum == 9){
+				data.altitudeChar[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.altitude = atof(data.altitudeChar);
+				}
+
+			} else if (dataElementNum == 10){
+				data.altitudeUnits = letter;
+
+			} else if (dataElementNum == 11){
+				break;
+			}
+
+		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
+			if (dataElementNum == 2){
+				data.validity = letter;
+
+			} else if (dataElementNum == 7){
+				data.speedCharKnots[dataElementIndex] = letter;
+				++dataElementIndex;
+				if(*(data.dataBuffer+i+1) == ','){
+					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
+				}
+
+			} else if(dataElementNum >= 8){
+				break;
+			}		}
+
+	}
+	return data;
+}
+
+void determineMax(gpsData* GPSData, Log* Log) {
+	Log->maxSpeed = (GPSData->speedMph > Log->maxSpeed) ? GPSData->speedMph : Log->maxSpeed;
+	Log->maxAltitude = (GPSData->altitude > Log->maxAltitude) ? GPSData->altitude : Log->maxAltitude;
+}
+
+ // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}
+
+// Bluetooth Functions
+void btSendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size) {
+	HAL_UART_Transmit(huart2, str, size, 1000);
+}
+
+// LCD Functions
+void printScreen(screenStates* s, Log* log) {
+	HD44780_SetCursor(0, 0);
+	char temp[16];
+	switch(*s) {
+		case speed:
+			HD44780_PrintStr("Max Speed (mph):");
+			HD44780_SetCursor(1, 0);
+			sprintf(temp, "%f", log->maxSpeed);
+			HD44780_PrintStr("                ");
+			HD44780_PrintStr(temp);
+			break;
+		case alt:
+			HD44780_PrintStr("Max Alt. (ft):  ");
+			HD44780_SetCursor(1, 0);
+			sprintf(temp, "%f", log->maxAltitude);
+			HD44780_PrintStr("                ");
+			HD44780_PrintStr(temp);
+			break;
+		case longest:
+			HD44780_PrintStr("Longest Run (m):");
+			HD44780_SetCursor(1, 0);
+			sprintf(temp, "%f", log->longestRun);
+			HD44780_PrintStr("                ");
+			HD44780_PrintStr(temp);
+			break;
+		case tallest:
+			HD44780_PrintStr("Tallest Run (m):");
+			HD44780_SetCursor(1, 0);
+			sprintf(temp, "%f", log->tallestRun);
+			HD44780_PrintStr("                ");
+			HD44780_PrintStr(temp);
+			break;
+		case startLog:
+			HD44780_PrintStr("Starting log    ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			// delay - while gps !connected
+			/* uint8_t count = 0;
+			 * while (gps_data.fix != 1) {
+			 *	++count;
+			 * }
+			 *
+			 * state = (count >= 1000000) ? stopLog : prevState;
+			 */
+			state = prevState;
+			break;
+		case stopLog:
+			HD44780_PrintStr("Stopping log    ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			// delay - 2 secs-ish
+			/* HAL_Delay(2000);
+			 */
+			state = save;
+			break;
+		case pauseLog:
+			HD44780_PrintStr("Log paused      ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			// pause logging
+			break;
+		case resumeLog:
+			HD44780_PrintStr("Resuming log... ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			// restart logging
+			state = prevState;
+			break;
+		case save:
+			HD44780_PrintStr("Saving log      ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			// save data to sd
+			/*
+			 *  fres = f_open(&fil, "logs.txt", FA_WRITE | FA_OPEN_ALWAYS);
+			 *  if (fres != FR_OK) {
+			 *  	state = error;
+			 *  }
+			 *  char t[100];
+			 *  f_puts("max speed: ", &fil);
+			 *  sprintf(t, "%f", log->maxSpeed);
+			 *  f_puts(t, &fil);
+			 *  f_puts(" | max alt: ", &fil);
+			 *  sprintf(t, "%f", log->maxAltitude);
+			 *  f_puts(t, &fil);
+			 *  f_puts(" | tallest: ", &fil);
+			 *  sprintf(t, "%f", log->tallestRun);
+			 *  f_puts(t, &fil);
+			 *  f_puts(" | longest: ", &fil);
+			 *  sprintf(t, "%f", log->longestRun);
+			 *  f_puts(t, &fil);
+			 *  f_puts(" | num runs: ", &fil);
+			 *  sprintf(t, "%f", log->numRuns);
+			 *  f_puts(t, &fil);
+			 *  f_puts("\n", &fil);
+			 *
+			 *  for (uint8_t i = 0; i < log->numRuns; ++i) {
+			 *  	f_puts("\trun ", &fil);
+			 *  	sprintf(t, "f", i);
+			 *  	f_puts(" - ", &fils);
+			 *		f_puts(" elapsed time: ", &fil);
+			 *      sprintf(t, "%f", log->run[i]->elapsedTime);
+			 *      f_puts(t, &fil);
+			 *      f_puts(" | vert dist: ", &fil);
+			 *      sprintf(t, "%f", log->verticalDistance);
+			 *      f_puts(t, &fil);
+			 *      f_puts(" | horiz dist: ", &fil);
+			 *      sprintf(t, "%f", log->horizontalDistance);
+			 *      f_puts(t, &fil);
+			 *      f_puts(" | avg speed: ", &fil);
+			 *      sprintf(t, "%f", log->averageSpeed);
+			 *      f_puts(t, &fil);
+			 *
+			 *      for (uint8_t j = 0; j < 300; ++j) {
+			 *      	f_puts(
+			 *
+			 *      }
+			 *  }
+			 */
+			state = prevState;
+			break;
+		case batTemp:
+			HD44780_PrintStr("Battery: ");
+			HD44780_PrintStr("xxx%   ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("Temp. (F): ");
+			HD44780_PrintStr("xxx  ");
+			break;
+		default:
+			HD44780_PrintStr("Error           ");
+			HD44780_SetCursor(1, 0);
+			HD44780_PrintStr("                ");
+			break;
+	}
+}
+
+float calcDistance(float lat1, float long1, float lat2, float long2) {
+	int R = 6371000;
+	float phi1 = lat1 * M_PI/180;
+	float phi2 = lat2 * M_PI/180;
+	float delPhi = (lat2-lat1) * M_PI/180;
+	float delLam = (long2-long1) * M_PI/180;
+
+	float a = (sin(delPhi/2)*sin(delPhi/2)) + (cos(phi1)*cos(phi2)*sin(delLam/2)*sin(delLam/2));
+	float c = 2 * atan2(sqrt(a), sqrt(1-a));
+
+	return R * c;
+}
+
+
+void IMU_Config(I2C_HandleTypeDef* hi2c1) {
+	uint8_t buf[2];
+	buf[0] = OPR_MODE;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	HAL_Delay(30);
+
+	/* Reset */
+	buf[0] = SYS_TRIGGER;
+	buf[1] = 0x20;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	HAL_Delay(30);
+
+	buf[0] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	while (buf[0] != 0xA0) {
+		HAL_Delay(10);
+		HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	}
+
+	HAL_Delay(50);
+
+	/* Normal Power Mode */
+	buf[0] = PWR_MODE;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	HAL_Delay(10);
+
+	/* Set Page Number to 0 */
+	buf[0] = PAGE_ID;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	/* Reset 8 */
+	buf[0] = SYS_TRIGGER;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	HAL_Delay(10);
+
+	/* Set Operation Mode */
+	buf[0] = OPR_MODE;
+	buf[1] = 0x0C;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	HAL_Delay(30);
+}
+
+void IMU_CalibrateRegisters(I2C_HandleTypeDef* hi2c1) {
+	uint8_t buf[2];
+	buf[0] = ACC_OFFSET_X_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_OFFSET_X_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_OFFSET_Y_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_OFFSET_Y_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_OFFSET_Z_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_OFFSET_Z_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_X_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_X_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_Y_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_Y_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_Z_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_OFFSET_Z_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_X_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_X_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_Y_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_Y_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_Z_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = GYR_OFFSET_Z_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_RADIUS_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = ACC_RADIUS_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_RADIUS_LSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+
+	buf[0] = MAG_RADIUS_MSB;
+	buf[1] = 0x00;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+}
+
+void IMU_Calibrate(I2C_HandleTypeDef* hi2c1) {
+	uint8_t system, gyro, accel, mg = 0;
+	uint8_t buf[1];
+	buf[0] = CALIB_STAT;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	system = (buf[0] >> 6) & 0x03;
+	gyro = (buf[0] >> 4) & 0x03;
+	accel = (buf[0] >> 2) & 0x03;
+	mg = buf[0] & 0x03;
+	// Stays in calibration until IMU is calibrated
+	while ((accel + gyro + mg + system) < 12) {
+		printf("Calibrating... aCal: %d gCal: %d mCal: %d sCal: %d \n\r", accel, gyro, mg, system);
+		HAL_Delay(100);
+	}
+}
+
+void IMU_GET_EUL(I2C_HandleTypeDef* hi2c1, float Euler[]) {
+	int16_t MEuler[3] = {0, 0, 0};
+	uint8_t buf[6];
+	buf[0] = EUL_HEADING_LSB;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 6, 1000);
+	MEuler[0] = buf[0] | (buf[1] << 8); // Heading
+	MEuler[1] = buf[2] | (buf[3] << 8); // Roll
+	MEuler[2] = buf[4] | (buf[5] << 8); // Pitch
+
+	// Might need to check this code
+	Euler[0] = fmod((float) MEuler[0] / 16.0, 360.0);
+	Euler[1] = fmod((float) MEuler[1] / 16.0, 360.0);
+	Euler[2] = fmod((float) MEuler[2] / 16.0, 360.0);
+}
+void IMU_GET_LIA(I2C_HandleTypeDef* hi2c1, float LIA[]) {
+	uint8_t buf[6];
+	int16_t MLIA[3] = {0, 0, 0};
+	buf[0] = LIA_DATA_X_LSB;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 6, 1000);
+	MLIA[0] = buf[0] | (buf[1] << 8);
+	MLIA[1] = buf[2] | (buf[3] << 8);
+	MLIA[2] = buf[4] | (buf[5] << 8);
+
+	LIA[0] = (float) MLIA[0] / 100.0;
+	LIA[1] = (float) MLIA[1] / 100.0;
+	LIA[2] = (float) MLIA[2] / 100.0;
+}
+
+void IMU_PRINT_DATA(I2C_HandleTypeDef* hi2c1, float Data[]) {
+	printf("%f %f %f \n\r", Data[0], Data[1], Data[2]);
+}
