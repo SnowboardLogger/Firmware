@@ -249,7 +249,7 @@ gpsData parseGps(gpsData data){
 				data.speedCharKnots[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.speedMph = atof(data.speedCharKnots);//1.15077945 * atof(data.speedCharKnots);
+					data.speedMph = 1.15077945 * atof(data.speedCharKnots);
 				}
 
 			} else if(dataElementNum >= 8){
