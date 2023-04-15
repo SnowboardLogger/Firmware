@@ -31,51 +31,10 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-typedef struct {
-	int hours;
-	char hoursChar[8];
-	int mins;
-	char minsChar[8];
-	double secs;
-	char secsChar[8];
-
-	volatile char dataBuffer[100];//max chars of 70 from gpgga
-	volatile int bufferIndex;
-
-	char latitudeChar[15];
-	double latitude;
-
-	char latDir;//N or S
-
-	char longitudeChar[15];
-	double longitude;
-
-	char longDir;//E or W
-
-	uint8_t fix;//0 = invalid, 1 = GPS fix, 2 = Dif. GPS fix
-
-	uint8_t numSatellites;
-	char numSatellitesChar[6];
-
-	double hdop;//Horizontal Dilution of Precision
-	char hdopChar[8];
-
-	double altitude;
-	char altitudeChar[8];
-
-	char altitudeUnits;//M = meters
-	//they have a checksum, do we need to use it?
-
-	char validity;
-
-	char speedCharKnots[10];
-	double speedMph;
-}gpsData;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -85,19 +44,6 @@ typedef struct {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-typedef enum {
-	speed,
-	alt,
-	longest,
-	tallest,
-	startLog,
-	stopLog,
-	pauseLog,
-	resumeLog,
-	save,
-	error
-} screenStates;
-volatile extern screenStates state;
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

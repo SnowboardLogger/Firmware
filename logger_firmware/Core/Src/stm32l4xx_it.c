@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "liquidcrystal_i2c.h"
+#include "driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,9 +43,16 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-volatile extern screenStates state;
-volatile extern screenStates prevState;
-volatile extern uint8_t isLogging;
+extern volatile uint16_t Timer1, Timer2;
+extern screenStates state; // Can't declare volatile for some reason, might need to wry about this
+extern screenStates prevState; // Same issue as state
+extern volatile uint8_t isLogging;
+extern volatile uint8_t buzEnable; // Buzzer Enable
+extern volatile uint8_t IMU_DATA_FLAG;
+extern volatile gpsData GPSData;
+extern volatile char bufferByte[1];
+uint16_t counter = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +66,7 @@ volatile extern uint8_t isLogging;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern TIM_HandleTypeDef htim16;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
@@ -186,7 +195,10 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+  if(Timer1 > 0)
+	  Timer1--;
+  if(Timer2 > 0)
+	  Timer2--;
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
@@ -207,45 +219,8 @@ void SysTick_Handler(void)
 void EXTI4_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI4_IRQn 0 */
-
-	// NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-	switch(state) {
-			case speed: {
-				prevState = state;
-				state = alt;
-				break; }
-			case alt: {
-				prevState = state;
-				state = longest;
-				break; }
-			case longest: {
-				prevState = state;
-				state = tallest;
-				break; }
-			case tallest: {
-				prevState = state;
-				state = speed;
-				break; }
-			case startLog: {
-				state = prevState;
-				break; }
-			case stopLog: {
-				state = prevState;
-				break; }
-			case pauseLog: {
-				state = prevState;
-				break; }
-			case resumeLog: {
-				break; }
-			case save: {
-				state = prevState;
-				break; }
-			default: {
-				prevState = state;
-				state = error;
-				break; }
-		}
-
+  // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
+  btnFourIRQ(&state, &prevState);
   /* USER CODE END EXTI4_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIOB4_Pin);
   /* USER CODE BEGIN EXTI4_IRQn 1 */
@@ -260,45 +235,8 @@ void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
-	// NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-	switch(state) {
-		case speed: {
-			prevState = state;
-			state = isLogging ? stopLog : startLog;
-			break; }
-		case alt: {
-			prevState = state;
-			state = isLogging ? stopLog : startLog;
-			break; }
-		case longest: {
-			prevState = state;
-			state = isLogging ? stopLog : startLog;
-			break; }
-		case tallest: {
-			prevState = state;
-			state = isLogging ? stopLog : startLog;
-			break; }
-		case startLog: {
-			isLogging = 1;
-			state = prevState;
-			break; }
-		case stopLog: {
-			isLogging = 0;
-			state = prevState;
-			break; }
-		case pauseLog: {
-			// stop log
-			break; }
-		case resumeLog: {
-			break; }
-		case save: {
-
-			break; }
-		default: {
-
-			break; }
-	}
-
+  // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
+  btnNineToFiveIRQ(&state, &prevState, isLogging);
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIOB5_Pin);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
@@ -307,16 +245,50 @@ void EXTI9_5_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles TIM1 update interrupt and TIM16 global interrupt.
+  */
+void TIM1_UP_TIM16_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM1_UP_TIM16_IRQn 0 */
+  // If Buzzer is enabled, oscillates at 2 kHz
+  if (buzEnable == 1) {
+	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_12);
+  }
+
+  // Set a IMU data flag to read data
+  if (counter % 8) {
+	  IMU_DATA_FLAG = 1;
+  } else {
+	  IMU_DATA_FLAG = 0;
+  }
+
+  counter = (counter > 60000) ? 0 : counter+1;
+
+  /* USER CODE END TIM1_UP_TIM16_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim16);
+  /* USER CODE BEGIN TIM1_UP_TIM16_IRQn 1 */
+  /* USER CODE END TIM1_UP_TIM16_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART1 global interrupt.
   */
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
+	if (GPSData.bufferIndex < BUFFER_SIZE){
+		GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
+	} else {
+		GPSData.bufferIndex = 0;
+	}
 
+	if(*bufferByte == '\n'){
+		GPSData.bufferIndex = 0;
+	}
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-
+  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
   /* USER CODE END USART1_IRQn 1 */
 }
 
@@ -327,38 +299,8 @@ void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
-	// NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-	switch(state) {
-		case speed: {
-			state = isLogging ? pauseLog : state;
-			break; }
-		case alt: {
-			state = isLogging ? pauseLog : state;
-			break; }
-		case longest: {
-			state = isLogging ? pauseLog : state;
-			break; }
-		case tallest: {
-			state = isLogging ? pauseLog : state;
-			break; }
-		case startLog: {
-			state = pauseLog;
-			break; }
-		case stopLog: {
-			break; }
-		case pauseLog: {
-			state = resumeLog;
-			break; }
-		case resumeLog: {
-			state = prevState;
-			break; }
-		case save: {
-			break; }
-		default: {
-
-			break; }
-	}
-
+  // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
+  btnFifteenToTenIEQ(&state, &prevState, isLogging);
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIO_Pin);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
