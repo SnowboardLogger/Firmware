@@ -414,12 +414,13 @@ int main(void)
 
   //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
 	//data on the GPS
-	char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C\r\n";
-	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+	//char inputBuffer[] = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C\r\n";
+	//HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
 	//Change GPS update frequency to every 3000 milliseconds
-	char inputBuffer2[] = "$PMTK220,3000*1F\r\n";
-	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer), 100);
+	char inputBuffer2[] = "$PMTK220,10000*1F\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
+
 
 	bytesReceived = 0;
 
