@@ -193,6 +193,9 @@ gpsData parseGps(gpsData data){
 
 			} else if (dataElementNum == 3){
 				data.latDir = letter;
+				if(data.latDir == 'W'){
+					data.latitude *= -1;
+				}
 
 			} else if (dataElementNum == 4){
 				data.longitudeChar[dataElementIndex] = letter;
@@ -203,6 +206,9 @@ gpsData parseGps(gpsData data){
 
 			} else if (dataElementNum == 5){
 				data.longDir = letter;
+				if(data.longDir == 'S'){
+					data.longitude *= -1;
+				}
 
 			} else if (dataElementNum == 6){
 				data.fix = (uint8_t) (letter - '0');
@@ -350,6 +356,19 @@ void checkRunStatus(gpsData data){
 		//Stopped right now so reset firstTimeOver
 	}
 
+}
+
+void stopGPS(){
+	//$PMTK161,0*28<CR><LF>
+	//Put GPS into standby, power saving mode
+	char inputBuffer[] = "$PMTK161,0*28\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+}
+
+void startGPS(){
+	//$PMTK225,0*2B<CR><LF>
+	char inputBuffer[] = "$PMTK225,0*2B\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 }
 /* USER CODE END 0 */
 
