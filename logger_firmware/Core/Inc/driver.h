@@ -70,13 +70,9 @@ typedef enum {
 
 typedef struct {
 	float GPSspeed;
-	float IMUspeed[3];
-	float IMUOrientation[3];
 	float altitude;
 	float longitude;
-	float latitude;
-	char longitudeDir;
-	char latitudeDir;
+	float latitude; // NE pos SW neg
 } GPSRequired;
 
 typedef struct {
@@ -84,7 +80,9 @@ typedef struct {
 	uint8_t verticalDistance;
 	uint8_t averageSpeed;
 	uint8_t horizontalDistance;
-	GPSRequired data[300];
+	uint8_t numberOfPoints;
+	GPSRequired data[200];
+	float IMUspeed[6000][3];
 } Run;
 
 typedef struct {
@@ -96,9 +94,24 @@ typedef struct {
 	Run run[20]; 	// Can have a max of 10 runs per log
 } Log ;
 
+typedef struct {
+	uint16_t accel_offset_x;
+	uint16_t accel_offset_y;
+	uint16_t accel_offset_z;
+	uint16_t mag_offset_x;
+	uint16_t mag_offset_y;
+	uint16_t mag_offset_z;
+	uint16_t gyro_offset_x;
+	uint16_t gyro_offset_y;
+	uint16_t gyro_offset_z;
+	uint16_t accel_radius;
+	uint16_t mag_radius;
+} IMU_OFFSET;
+
 // Declaration of both states
 extern screenStates state;
 extern screenStates prevState;
+extern IMU_OFFSET offset_cal_data;
 
 #define BUFFER_SIZE 100
 
@@ -301,9 +314,14 @@ void printScreen(screenStates* s, Log* log);
 void IMU_Config(I2C_HandleTypeDef* hi2c1);
 void IMU_CalibrateRegisters(I2C_HandleTypeDef* hi2c1);
 void IMU_Calibrate(I2C_HandleTypeDef* hi2c1);
-void IMU_GET_EUL(I2C_HandleTypeDef* hi2c1, float Euler[]);
-void IMU_GET_LIA(I2C_HandleTypeDef* hi2c1, float LIA[]);
-void IMU_PRINT_DATA(I2C_HandleTypeDef* hi2c1, float Data[]);
+void IMU_GET_EUL(I2C_HandleTypeDef* hi2c1, float* Euler[]);
+void IMU_GET_LIA(I2C_HandleTypeDef* hi2c1, float* LIA[]);
+float IMU_GET_TEMP(I2C_HandleTypeDef* hi2c1);
+void IMU_PRINT_DATA(I2C_HandleTypeDef* hi2c1, float* Data[]);
+void IMU_POWER_ON(I2C_HandleTypeDef* hi2c1);
+void IMU_POWER_OFF(I2C_HandleTypeDef* hi2c1);
+void IMU_SAVE_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
+void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
 
 // SD Card
 void SD_Save_Data();

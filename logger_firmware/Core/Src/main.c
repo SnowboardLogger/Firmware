@@ -60,11 +60,12 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 screenStates state = speed;
 screenStates prevState;
+IMU_OFFSET offset_cal_data;
 volatile uint8_t isLogging = 0;
 uint8_t bytesReceived;
 volatile char bufferByte[1];
-// Will store upto ten logs
-Log recordedData[10];
+// Will store up to ten logs
+Log recordedData;
 // Booleans for Timer Values
 volatile uint8_t buzEnable = 0;
 volatile uint8_t IMU_DATA_FLAG = 0;
@@ -168,6 +169,7 @@ int main(void)
 
   // Will listen for an interrupt on this pin
   HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
+  IMU_Config(&hi2c1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
