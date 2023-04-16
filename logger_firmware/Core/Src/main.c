@@ -169,7 +169,7 @@ int main(void)
 
   // Will listen for an interrupt on this pin
   HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
-  IMU_Config(&hi2c1);
+  //IMU_Config(&hi2c1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -179,6 +179,100 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  HD44780_SetCursor(0, 0);
+	  	char temp[16];
+	  	switch(state) {
+	  		case speed:
+	  			HD44780_PrintStr("Max Speed (mph):");
+	  			HD44780_SetCursor(1, 0);
+	  			sprintf(temp, "%f", recordedData.maxSpeed);
+	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr(temp);
+	  			break;
+	  		case alt:
+	  			HD44780_PrintStr("Max Alt. (m):   ");
+	  			HD44780_SetCursor(1, 0);
+	  			sprintf(temp, "%f", recordedData.maxAltitude);
+	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr(temp);
+	  			break;
+	  		case longest:
+	  			HD44780_PrintStr("Longest Run (m):");
+	  			HD44780_SetCursor(1, 0);
+	  			sprintf(temp, "%f", recordedData.longestRun);
+	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr(temp);
+	  			break;
+	  		case tallest:
+	  			HD44780_PrintStr("Tallest Run (m):");
+	  			HD44780_SetCursor(1, 0);
+	  			sprintf(temp, "%f", recordedData.tallestRun);
+	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr(temp);
+	  			break;
+	  		case steepest:
+	  			HD44780_PrintStr("Steepest (deg): ");
+				HD44780_SetCursor(1, 0);
+				sprintf(temp, "%f", recordedData.steepestRun);
+				HD44780_PrintStr("                ");
+				HD44780_PrintStr(temp);
+				break;
+	  		case startLog:
+	  			HD44780_PrintStr("Starting log    ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			// delay - while gps !connected
+	  			// TODO This should timeout using a timer
+	  			/* uint8_t count = 0;
+	  			 * while (gps_data.fix != 1) {
+	  			 *	++count;
+	  			 * }
+	  			 *
+	  			 * state = (count >= 1000000) ? stopLog : prevState;
+	  			 */
+	  			state = prevState;
+	  			break;
+	  		case stopLog:
+	  			HD44780_PrintStr("Stopping log    ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			// delay - 2 secs-ish
+	  			HAL_Delay(2000);
+	  			state = save;
+	  			break;
+	  		case pauseLog:
+	  			HD44780_PrintStr("Log paused      ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			// pause logging
+	  			break;
+	  		case resumeLog:
+	  			HD44780_PrintStr("Resuming log... ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			// restart logging
+	  			state = prevState;
+	  			break;
+	  		case save:
+	  			HD44780_PrintStr("Log Saved       ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			// save data to sd
+	  			sdTest(&recordedData);
+	  			state = prevState;
+	  			break;
+	  		case battery:
+	  			HD44780_PrintStr("Battery %:      ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr("battery percent ");
+	  			break;
+	  		default:
+	  			HD44780_PrintStr("Error           ");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("                ");
+	  			break;
+	  	}
   }
   /* USER CODE END 3 */
 }

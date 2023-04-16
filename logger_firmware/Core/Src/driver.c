@@ -1,7 +1,7 @@
 #include "driver.h"
 
 void btnFourIRQ(screenStates* state, screenStates* prevState) {
-
+	buzEnable = 1;
 	switch(*state) {
 		case speed:
 			*prevState = *state;
@@ -17,6 +17,10 @@ void btnFourIRQ(screenStates* state, screenStates* prevState) {
 			break;
 		case tallest:
 			*prevState = *state;
+			*state = steepest;
+			break;
+		case steepest:
+			*state = *prevState;
 			*state = speed;
 			break;
 		case startLog:
@@ -42,43 +46,70 @@ void btnFourIRQ(screenStates* state, screenStates* prevState) {
 	}
 }
 
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
+	buzEnable = 1;
 	switch(*state) {
 		case speed:
+			*prevState = *state;
+			*state = *isLogging ? stopLog : startLog;
+			break;
 		case alt:
+			*prevState = *state;
+			*state = *isLogging ? stopLog : startLog;
+			break;
 		case longest:
+			*prevState = *state;
+			*state = *isLogging ? stopLog : startLog;
+			break;
 		case tallest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			*state = *isLogging ? stopLog : startLog;
+			break;
+		case steepest:
+			*prevState = *state;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case startLog:
-			isLogging = 1;
+			*isLogging = 1;
 			break;
 		case stopLog:
-			isLogging = 0;
+			*isLogging = 0;
 			break;
 		case pauseLog:
+			*isLogging = 0;
+			*state = stopLog;
+			break;
 		case resumeLog:
-			isLogging = 0;
+			*isLogging = 0;
 			*state = stopLog;
 			break;
 		case save:
 			break;
 		case battery:
-			*state = isLogging ? stopLog : startLog;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		default:
 			break;
 	}
 }
 
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
+	buzEnable = 1;
 	switch(*state) {
 		case speed:
+			*state = *isLogging ? pauseLog : battery;
+			break;
 		case alt:
+			*state = *isLogging ? pauseLog : battery;
+			break;
 		case longest:
+			*state = *isLogging ? pauseLog : battery;
+			break;
 		case tallest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
+			break;
+		case steepest:
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case startLog:
 			*state = pauseLog;
@@ -311,52 +342,7 @@ void printScreen(screenStates* s, Log* log) {
 			HD44780_SetCursor(1, 0);
 			HD44780_PrintStr("                ");
 			// save data to sd
-			/*
-			 *  fres = f_open(&fil, "logs.txt", FA_WRITE | FA_OPEN_ALWAYS);
-			 *  if (fres != FR_OK) {
-			 *  	state = error;
-			 *  }
-			 *  char t[100];
-			 *  f_puts("max speed: ", &fil);
-			 *  sprintf(t, "%f", log->maxSpeed);
-			 *  f_puts(t, &fil);
-			 *  f_puts(" | max alt: ", &fil);
-			 *  sprintf(t, "%f", log->maxAltitude);
-			 *  f_puts(t, &fil);
-			 *  f_puts(" | tallest: ", &fil);
-			 *  sprintf(t, "%f", log->tallestRun);
-			 *  f_puts(t, &fil);
-			 *  f_puts(" | longest: ", &fil);
-			 *  sprintf(t, "%f", log->longestRun);
-			 *  f_puts(t, &fil);
-			 *  f_puts(" | num runs: ", &fil);
-			 *  sprintf(t, "%f", log->numRuns);
-			 *  f_puts(t, &fil);
-			 *  f_puts("\n", &fil);
-			 *
-			 *  for (uint8_t i = 0; i < log->numRuns; ++i) {
-			 *  	f_puts("\trun ", &fil);
-			 *  	sprintf(t, "f", i);
-			 *  	f_puts(" - ", &fils);
-			 *		f_puts(" elapsed time: ", &fil);
-			 *      sprintf(t, "%f", log->run[i]->elapsedTime);
-			 *      f_puts(t, &fil);
-			 *      f_puts(" | vert dist: ", &fil);
-			 *      sprintf(t, "%f", log->verticalDistance);
-			 *      f_puts(t, &fil);
-			 *      f_puts(" | horiz dist: ", &fil);
-			 *      sprintf(t, "%f", log->horizontalDistance);
-			 *      f_puts(t, &fil);
-			 *      f_puts(" | avg speed: ", &fil);
-			 *      sprintf(t, "%f", log->averageSpeed);
-			 *      f_puts(t, &fil);
-			 *
-			 *      for (uint8_t j = 0; j < 300; ++j) {
-			 *      	f_puts(
-			 *
-			 *      }
-			 *  }
-			 */
+//			sdTest();
 			state = prevState;
 			break;
 		case battery:
@@ -748,4 +734,115 @@ void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type) {
 	buf[0] = ACC_OFFSET_X_LSB;
 	buf[1] = (offset_type->accel_offset_x) & 0xFF;
 	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+}
+
+void sdTest(Log* log) {
+
+	  FATFS       FatFs;                //Fatfs handle
+	  FIL         fil;                  //File handle
+	  FRESULT     fres;                 //Result after operations
+
+	  fres = f_mount(&FatFs, "", 1);    //1=mount now
+	  if (fres != FR_OK) {
+		return;
+	  }
+
+	  fres = f_open(&fil, "logs.txt", FA_WRITE | FA_OPEN_ALWAYS);
+	  if (fres != FR_OK) {
+//		  state = error;
+		  return;
+	  }
+	  char t[100];
+
+	  f_puts("max speed: ", &fil);
+	  sprintf(t, "%f", log->maxSpeed);
+	  f_puts(t, &fil);
+
+	  f_puts(" | max alt: ", &fil);
+	  sprintf(t, "%f", log->maxAltitude);
+	  f_puts(t, &fil);
+
+	  f_puts(" | tallest: ", &fil);
+	  sprintf(t, "%f", log->tallestRun);
+	  f_puts(t, &fil);
+
+	  f_puts(" | longest: ", &fil);
+	  sprintf(t, "%f", log->longestRun);
+	  f_puts(t, &fil);
+
+	  f_puts(" | num runs: ", &fil);
+	  sprintf(t, "%i", log->numberOfRuns);
+	  f_puts(t, &fil);
+
+	  f_puts("\n", &fil);
+
+	  for (uint8_t i = 0; i < log->numberOfRuns; ++i) {
+
+	   	f_puts("\trun ", &fil);
+	   	sprintf(t, "%i", i);
+		f_puts(t, &fil);
+	   	f_puts(" - ", &fil);
+
+	 	f_puts(" elapsed time: ", &fil);
+	    	sprintf(t, "%i", log->run[i].elapsedTime);
+	  	f_puts(t, &fil);
+
+	    	f_puts(" | vert dist: ", &fil);
+	    	sprintf(t, "%i", log->run[i].verticalDistance);
+	    	f_puts(t, &fil);
+
+	    	f_puts(" | horiz dist: ", &fil);
+	    	sprintf(t, "%i", log->run[i].horizontalDistance);
+	    	f_puts(t, &fil);
+
+	    	f_puts(" | avg speed: ", &fil);
+	    	sprintf(t, "%i", log->run[i].averageSpeed);
+	    	f_puts(t, &fil);
+
+		f_puts(" | num points: ", &fil);
+	    	sprintf(t, "%i", log->run[i].numberOfPoints);
+	    	f_puts(t, &fil);
+
+		f_puts("\n", &fil);
+
+		for (uint8_t j = 0; j < log->run[i].numberOfPoints; ++j) {
+
+			f_puts("\t\tdata point ", &fil);
+	    		sprintf(t, "%d", j);
+	    		f_puts(t, &fil);
+			f_puts(" - ", &fil);
+
+			f_puts(" speed: ", &fil);
+	    		sprintf(t, "%i", log->run[i].data[j].GPSspeed);
+	    		f_puts(t, &fil);
+
+			f_puts(" | altitude: ", &fil);
+	    		sprintf(t, "%i", log->run[i].data[j].altitude);
+	    		f_puts(t, &fil);
+
+			f_puts(" | longitude: ", &fil);
+	    		sprintf(t, "%i", log->run[i].data[j].longitude);
+	    		f_puts(t, &fil);
+
+			f_puts(" | latitude: ", &fil);
+	    		sprintf(t, "%i", log->run[i].data[j].latitude);
+	    		f_puts(t, &fil);
+
+			f_puts("\n", &fil);
+
+		}
+
+//		for (uint8_t k = 0; k < 6000; ++k) {
+//			f_puts("\t\t ", &fil);
+//			for (uint8_t a = 0; a < 3; ++a) {
+//				sprintf(t, "%f", log->run[i].IMUspeed[k][a]);
+//	    			f_puts(t, &fil);
+//				f_puts(", ", &fil);
+//			}
+//			f_puts("\n", &fil);
+//		}
+
+	   }
+	  f_close(&fil);
+	  f_mount(NULL, "", 0);
 }

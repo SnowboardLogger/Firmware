@@ -51,7 +51,8 @@ extern volatile uint8_t buzEnable; // Buzzer Enable
 extern volatile uint8_t IMU_DATA_FLAG;
 extern volatile gpsData GPSData;
 extern volatile char bufferByte[1];
-uint16_t counter = 0;
+uint32_t counter = 0;
+volatile uint32_t buttonCounter = 0;
 
 /* USER CODE END PV */
 
@@ -236,7 +237,7 @@ void EXTI9_5_IRQHandler(void)
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
   // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-  btnNineToFiveIRQ(&state, &prevState, isLogging);
+  btnNineToFiveIRQ(&state, &prevState, &isLogging);
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIOB5_Pin);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
@@ -253,6 +254,11 @@ void TIM1_UP_TIM16_IRQHandler(void)
   // If Buzzer is enabled, oscillates at 2 kHz
   if (buzEnable == 1) {
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_12);
+	  buttonCounter++;
+	  if (buttonCounter > 500) {
+		  buzEnable = 0;
+		  buttonCounter = 0;
+	  }
   }
 
   // Set a IMU data flag to read data
@@ -300,7 +306,7 @@ void EXTI15_10_IRQHandler(void)
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
   // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-  btnFifteenToTenIEQ(&state, &prevState, isLogging);
+  btnFifteenToTenIEQ(&state, &prevState, &isLogging);
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIO_Pin);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */

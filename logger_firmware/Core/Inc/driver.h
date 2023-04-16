@@ -12,6 +12,9 @@ extern "C" {
 #include <string.h>
 #include "liquidcrystal_i2c.h"
 #include "stm32l4xx_hal.h"
+#include "fatfs.h"
+
+extern volatile uint8_t buzEnable;
 
 typedef struct {
 	int hours;
@@ -59,6 +62,7 @@ typedef enum {
 	alt,
 	longest,
 	tallest,
+	steepest,
 	startLog,
 	stopLog,
 	pauseLog,
@@ -82,7 +86,7 @@ typedef struct {
 	uint8_t horizontalDistance;
 	uint8_t numberOfPoints;
 	GPSRequired data[200];
-	float IMUspeed[6000][3];
+//	float IMUspeed[6000][3];
 } Run;
 
 typedef struct {
@@ -90,8 +94,9 @@ typedef struct {
 	float maxAltitude;
 	float tallestRun;
 	float longestRun;
+	float steepestRun;
 	uint8_t numberOfRuns;
-	Run run[20]; 	// Can have a max of 10 runs per log
+	Run run[10]; 	// Can have a max of 10 runs per log
 } Log ;
 
 typedef struct {
@@ -297,8 +302,8 @@ extern IMU_OFFSET offset_cal_data;
 
 // Button Interrupt
 void btnFourIRQ(screenStates* state, screenStates* prevState);
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging);
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging);
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
 
 // GPS Stuff
 gpsData parseGps(gpsData data);
@@ -324,7 +329,7 @@ void IMU_SAVE_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
 void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
 
 // SD Card
-void SD_Save_Data();
+void sdTest(Log* log);
 
 #ifdef __cplusplus
 }
