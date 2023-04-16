@@ -133,7 +133,7 @@ runData run_data = {
 };
 
 uint16_t calcCheckSum(gpsData *data){
-	int i = 0;
+	int i = 1;
 	char letter = *(data->dataBuffer);
 	uint16_t sum = 0;
 
@@ -166,10 +166,10 @@ gpsData parseGps(gpsData data){
 			dataElementIndex = 0;
 		}
 
-		if(letter == '\n'){
+		/*if(letter == '\n'){
 			++dataElementNum;
 			dataElementIndex = 0;
-		}
+		}*/
 
 		if(dataElementNum == 0 && letter != ','){
 			//datatype, either GPGGA or GPRMC
@@ -270,19 +270,20 @@ gpsData parseGps(gpsData data){
 			} else if (dataElementNum == 10){
 				data.altitudeUnits = letter;
 
-			} else if (dataElementNum == 15){
+			} else if (dataElementNum == 14){
 
-				//ignore the N and *
-				if(dataElementIndex >=2){
+				//ignore the *
+				if(letter != '*' && letter != '\r' && letter != '\n'){
 					data.checksum[dataElementIndex] = letter;
+					++dataElementIndex;
 				}
-				++dataElementIndex;
 
-
-				if(dataElementIndex == 3){
+				if(dataElementIndex == 2){
 					uint16_t check = calcCheckSum(&data);
+					char checkHex[3];
+					sprintf(checkHex, "%02X", check);
 
-					if((uint16_t) data.checksum == check){
+					if(strcmp(data.checksum, checkHex)==0){
 						//data is good
 						data.dataGood = 1;
 					}else {
@@ -290,6 +291,7 @@ gpsData parseGps(gpsData data){
 					}
 
 				}
+
 			}
 
 		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
@@ -314,12 +316,11 @@ gpsData parseGps(gpsData data){
 			} else if(dataElementNum >= 8){
 				break;
 			}
-
-			if(letter == '\n'){
-				break;
-			}
 		}
 
+		if(letter == '\n' || letter == '\r'){
+			break;
+		}
 	}
 	return data;
 }
@@ -532,7 +533,7 @@ int main(void)
 	btSendData("hello world\r\n", sizeof("hello world\r\n"));
 
 	printf("Time: %u:%u:%f | ", gps_data.hours, gps_data.mins, gps_data.secs);
-	printf("Latitude: %f", gps_data.latitude);
+	/*printf("Latitude: %f", gps_data.latitude);
 	printf(" %c", gps_data.latDir);
 	printf(" | Longitude: %f", gps_data.longitude);
 	printf(" %c", gps_data.longDir);
@@ -541,7 +542,7 @@ int main(void)
 	printf(" | HDOP: %f", gps_data.hdop);
 	printf(" | altitude: %f", gps_data.altitude);
 	printf(" %c", gps_data.altitudeUnits);
-	printf(" | Validity: %c", gps_data.validity);
+	printf(" | Validity: %c", gps_data.validity);*/
 	printf(" | Speed: %f", gps_data.speedMph);
 	printf(" | dataGood: %u", gps_data.dataGood);
 	printf("\n");
