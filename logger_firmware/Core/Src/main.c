@@ -121,8 +121,10 @@ volatile gpsData gps_data = {
 		  'V',//validity
 		  "xxx",//speedCharKnots
 		  0, //speedMph
-		  "0",//checksum
-		  0//dataGood
+		  "0",//checksumgga
+		  0,//dataGoodgga
+		  "0",//checksumrmc
+		  0//dataGoodrmc
 			};
 uint8_t bytesReceived;
 volatile char bufferByte[1];
@@ -201,7 +203,7 @@ gpsData parseGps(gpsData data){
 					data.secsChar[dataElementIndex] = letter;
 					++dataElementIndex;
 					if (*(data.dataBuffer+i+1) == ','){
-						data.secs = atof(data.secsChar);
+						data.secs = strtof(data.secsChar, NULL);
 						dataElementIndex = 0;
 						data.timeInSecs = data.secs + (data.mins * 60) + (data.hours * 24 * 60);
 					}
@@ -214,7 +216,7 @@ gpsData parseGps(gpsData data){
 				data.latitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.latitude = atof(data.latitudeChar);
+					data.latitude = strtof(data.latitudeChar, NULL);
 				}
 
 			} else if (dataElementNum == 3){
@@ -227,7 +229,7 @@ gpsData parseGps(gpsData data){
 				data.longitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.longitude = atof(data.longitudeChar);
+					data.longitude = strtof(data.longitudeChar, NULL);
 				}
 
 			} else if (dataElementNum == 5){
@@ -250,14 +252,14 @@ gpsData parseGps(gpsData data){
 				data.hdopChar[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					data.hdop = atof(data.hdopChar);
+					data.hdop = strtof(data.hdopChar, NULL);
 				}
 
 			} else if (dataElementNum == 9){
 				data.altitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					float alt = atof(data.altitudeChar);
+					float alt = strtof(data.altitudeChar, NULL);
 
 					//Either we are on a plane or this is wrong because mt everest is 8849 M tall rn
 					if(alt <= 8900){
@@ -274,7 +276,7 @@ gpsData parseGps(gpsData data){
 
 				//ignore the *
 				if(letter != '*' && letter != '\r' && letter != '\n'){
-					data.checksum[dataElementIndex] = letter;
+					data.checksumgga[dataElementIndex] = letter;
 					++dataElementIndex;
 				}
 
@@ -283,11 +285,11 @@ gpsData parseGps(gpsData data){
 					char checkHex[3];
 					sprintf(checkHex, "%02X", check);
 
-					if(strcmp(data.checksum, checkHex)==0){
+					if(strcmp(data.checksumgga, checkHex)==0){
 						//data is good
-						data.dataGood = 1;
+						data.ggaGood = 1;
 					}else {
-						data.dataGood = 0;
+						data.ggaGood = 0;
 					}
 
 				}
@@ -302,9 +304,13 @@ gpsData parseGps(gpsData data){
 				data.speedCharKnots[dataElementIndex] = letter;
 				++dataElementIndex;
 				if(*(data.dataBuffer+i+1) == ','){
-					float speed = 1.15077945 * atof(data.speedCharKnots);
+					float speed = 1.15077945 * strtof(data.speedCharKnots, NULL);
 
 					//Either we are on a plane or this is wrong because the land speed record is 1200mph
+					char temp[16];
+					HD44780_SetCursor(1, 0);
+					sprintf(temp, "%f", gps_data.speedMph);
+					HD44780_PrintStr(temp);
 					if(speed <= 1200){
 						data.speedMph = speed;
 					}else {
@@ -313,8 +319,28 @@ gpsData parseGps(gpsData data){
 
 				}
 
-			} else if(dataElementNum >= 8){
-				break;
+			} else if (dataElementNum == 11){
+
+				//ignore the *
+				if(letter != '*' && letter != '\r' && letter != '\n'){
+					data.checksumrmc[dataElementIndex] = letter;
+					++dataElementIndex;
+				}
+
+				if(dataElementIndex == 2){
+					uint16_t check = calcCheckSum(&data);
+					char checkHex[3];
+					sprintf(checkHex, "%02X", check);
+
+					if(strcmp(data.checksumrmc, checkHex)==0){
+						//data is good
+						data.rmcGood = 1;
+					}else {
+						data.rmcGood = 0;
+					}
+
+				}
+
 			}
 		}
 
@@ -528,11 +554,16 @@ int main(void)
 
 	//}
 
-	printScreen(state, prevState);
+	//printScreen(state, prevState);
+
+	  char temp[16];
+	HD44780_SetCursor(0, 0);
+	sprintf(temp, "good? : %i", gps_data.ggaGood);
+	HD44780_PrintStr(temp);
 
 	btSendData("hello world\r\n", sizeof("hello world\r\n"));
 
-	printf("Time: %u:%u:%f | ", gps_data.hours, gps_data.mins, gps_data.secs);
+	//printf("Time: %u:%u:%f | ", gps_data.hours, gps_data.mins, gps_data.secs);
 	/*printf("Latitude: %f", gps_data.latitude);
 	printf(" %c", gps_data.latDir);
 	printf(" | Longitude: %f", gps_data.longitude);
@@ -543,9 +574,9 @@ int main(void)
 	printf(" | altitude: %f", gps_data.altitude);
 	printf(" %c", gps_data.altitudeUnits);
 	printf(" | Validity: %c", gps_data.validity);*/
-	printf(" | Speed: %f", gps_data.speedMph);
-	printf(" | dataGood: %u", gps_data.dataGood);
-	printf("\n");
+	//printf(" | Speed: %f", gps_data.speedMph);
+	//printf(" | dataGood: %u", gps_data.dataGood);
+	//printf("\n");
   }
   /* USER CODE END 3 */
 }
@@ -833,9 +864,10 @@ static void MX_GPIO_Init(void)
 				HD44780_PrintStr(temp);
 				break; }
 			case tallest: {
-				HD44780_PrintStr("Tallest Run (m):");
+				//HD44780_PrintStr("Tallest Run (m):");
+				HD44780_PrintStr("Current Speed (mph):");
 				HD44780_SetCursor(1, 0);
-				sprintf(temp, "%f", tallestRun);
+				sprintf(temp, "%f", gps_data.speedMph);
 				HD44780_PrintStr(temp);
 				break; }
 			case startLog: {
