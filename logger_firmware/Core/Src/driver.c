@@ -297,7 +297,7 @@ void printScreen(screenStates* s, Log* log) {
 			HD44780_PrintStr("Log paused      ");
 			HD44780_SetCursor(1, 0);
 			HD44780_PrintStr("                ");
-			// pasue logging
+			// pause logging
 			break;
 		case resumeLog:
 			HD44780_PrintStr("Resuming log... ");
