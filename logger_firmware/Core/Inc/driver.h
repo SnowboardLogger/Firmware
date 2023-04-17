@@ -23,6 +23,7 @@ typedef struct {
 	char minsChar[8];
 	float secs;
 	char secsChar[8];
+	float timeInSecs;
 
 	volatile char dataBuffer[100];//max chars of 70 from gpgga
 	volatile int bufferIndex;
@@ -55,6 +56,12 @@ typedef struct {
 
 	char speedCharKnots[10];
 	float speedMph;
+
+	char checksumgga[6];
+	int ggaGood;
+
+	char checksumrmc[6];
+	int rmcGood;
 } gpsData;
 
 typedef enum {
@@ -309,7 +316,7 @@ void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isL
 void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
 
 // GPS Stuff
-gpsData parseGps(gpsData data);
+void parseGps(gpsData *data);
 void determineMax(gpsData* GPSData, Log* Log);
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef huart1);
 float calcDistance(float lat1, float long1, float lat2, float long2);

@@ -301,7 +301,11 @@ void TIM1_UP_TIM16_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-	if (GPSData.bufferIndex < BUFFER_SIZE){
+
+  /* USER CODE END USART1_IRQn 0 */
+  HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
+  	if (GPSData.bufferIndex < BUFFER_SIZE){
 		GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
 	} else {
 		GPSData.bufferIndex = 0;
@@ -310,9 +314,6 @@ void USART1_IRQHandler(void)
 	if(*bufferByte == '\n'){
 		GPSData.bufferIndex = 0;
 	}
-  /* USER CODE END USART1_IRQn 0 */
-  HAL_UART_IRQHandler(&huart1);
-  /* USER CODE BEGIN USART1_IRQn 1 */
   HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
   /* USER CODE END USART1_IRQn 1 */
 }

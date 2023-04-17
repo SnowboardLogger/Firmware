@@ -83,6 +83,7 @@ volatile gpsData GPSData = {
 		  "mm",
 		  0,
 		  "ss.ss",
+		  0,
 		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
 	  	  0,//bufferIndex
 		  "lllll.ll",//latitudeChar[]
@@ -102,6 +103,10 @@ volatile gpsData GPSData = {
 		  'V',//validity
 		  "xxx",//speedCharKnots
 		  0, //speedMph
+		  "0",//checksumgga
+		  0,//dataGoodgga
+		  "0",//checksumrmc
+		  0//dataGoodrmc
 };
 /* USER CODE END PV */
 
@@ -170,9 +175,14 @@ int main(void)
   HD44780_NoBlink(); // Don't blink cursor
   HD44780_NoCursor(); // Don't show cursor
 
-  //enable GGA for GPS (contains the precision data) and RMC (contains all the minimum navigation info)
-  char inputBuffer[] = "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
-  HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+  //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
+  	//data on the GPS
+  	char inputBuffer[] = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n";
+  	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+
+  	//Change GPS update frequency to every 3000 milliseconds
+  	char inputBuffer2[] = "$PMTK220,3000*1D\r\n";
+  	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
   bytesReceived = 0;
 
   uint8_t curLog, curRun, curDataPoint;
@@ -192,6 +202,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  parseGps(&GPSData);
+	  //Add Check Run Status here
+	  determineMax(&GPSData, &recordedData);
+
 	  HD44780_SetCursor(0, 0);
 	  	char temp[16];
 	  	switch(state) {
