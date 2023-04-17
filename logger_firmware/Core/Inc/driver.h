@@ -300,6 +300,9 @@ extern IMU_OFFSET offset_cal_data;
 #define ACC_CONFIG 0x8
 #define PAGE_ID 0x7
 
+// State Control
+switchToErrorState(screenStates* s);
+
 // Button Interrupt
 void btnFourIRQ(screenStates* state, screenStates* prevState);
 void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
@@ -327,6 +330,7 @@ void IMU_POWER_ON(I2C_HandleTypeDef* hi2c1);
 void IMU_POWER_OFF(I2C_HandleTypeDef* hi2c1);
 void IMU_SAVE_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
 void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
+float getBatteryPercentage(float temp, uint32_t adcVal);
 
 // SD Card
 void sdTest(Log* log);

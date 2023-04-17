@@ -52,7 +52,9 @@ extern volatile uint8_t IMU_DATA_FLAG;
 extern volatile gpsData GPSData;
 extern volatile char bufferByte[1];
 uint32_t counter = 0;
+uint32_t timer6 = 0;
 volatile uint32_t buttonCounter = 0;
+extern volatile uint32_t adcOutput;
 
 /* USER CODE END PV */
 
@@ -67,6 +69,8 @@ volatile uint32_t buttonCounter = 0;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern ADC_HandleTypeDef hadc1;
+extern TIM_HandleTypeDef htim6;
 extern TIM_HandleTypeDef htim16;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
@@ -230,6 +234,21 @@ void EXTI4_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles ADC1 global interrupt.
+  */
+void ADC1_IRQHandler(void)
+{
+  /* USER CODE BEGIN ADC1_IRQn 0 */
+
+  /* USER CODE END ADC1_IRQn 0 */
+  HAL_ADC_IRQHandler(&hadc1);
+  /* USER CODE BEGIN ADC1_IRQn 1 */
+  adcOutput = HAL_ADC_GetValue(&hadc1);
+  HAL_ADC_Start_IT(&hadc1);
+  /* USER CODE END ADC1_IRQn 1 */
+}
+
+/**
   * @brief This function handles EXTI line[9:5] interrupts.
   */
 void EXTI9_5_IRQHandler(void)
@@ -312,6 +331,33 @@ void EXTI15_10_IRQHandler(void)
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
 
   /* USER CODE END EXTI15_10_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM6 global interrupt, DAC channel1 and channel2 underrun error interrupts.
+  */
+void TIM6_DAC_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
+	/*
+  if (GPSTimeout == 1 && timer6 % 15 == 0) {
+	  switchToErrorState();
+	  GPSTimeout = 0;
+	  if (IMUTimeout == 0) { timer6 = 0; }
+  }
+  if (IMUTimeout == 1 && timer6 % 60 == 0) {
+	  switchToErrorState();
+	  IMUTimeout = 0;
+	  if (GPSTimeout == 0) { timer6 = 0; }
+  }
+  printf("HELLO");
+  timer6 = (t6_EN) ? timer6+1 : t6_EN;
+  */
+  /* USER CODE END TIM6_DAC_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim6);
+  /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
+
+  /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
