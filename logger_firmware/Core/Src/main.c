@@ -375,12 +375,12 @@ void determineMax(gpsData data){
 	}
 
 	float runLength = calcDistance(run_data.startLat,run_data.startLong,run_data.stopLat,run_data.stopLong);
-	if(runLength > longestRun && runStatus == notRunning){
+	if(runLength > longestRun){// && runStatus == notRunning){
 		longestRun = runLength;
 	}
 
 	float runHeight = run_data.startAlt - run_data.stopAlt;
-	if(runHeight > tallestRun && runStatus == notRunning){
+	if(runHeight > tallestRun){ //&& runStatus == notRunning){
 		tallestRun = runHeight;
 	}
 
