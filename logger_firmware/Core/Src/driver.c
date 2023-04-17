@@ -849,7 +849,8 @@ void sdTest(Log* log) {
 
 float getBatteryPercentage(float temp, uint32_t adcVal){
 	int batteryCalcMatrix[3][2] = {{5,2},{-5,5},{-100,10}}; //each row is a temp band, going lowest to highest
-	float delta = 2.0f*(adcVal*3.3/4096.0) - 2.8;
+	float delta = 2.0f*((adcVal+350)*2.0/2260.0) - 2.8;
+//	float delta = (adcVal*2)/2260.0;
 	float percentage = -999;
 	if(delta <= 0){
 		percentage = 0;
@@ -869,4 +870,6 @@ float getBatteryPercentage(float temp, uint32_t adcVal){
 			}
 		}
 	}
+
+	return percentage;
 }

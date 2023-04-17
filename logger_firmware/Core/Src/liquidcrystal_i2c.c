@@ -215,6 +215,7 @@ void HD44780_LoadCustomCharacter(uint8_t char_num, uint8_t *rows)
 
 void HD44780_PrintStr(const char c[])
 {
+	int x = 1 + 3;
   while(*c) SendChar(*c++);
 }
 

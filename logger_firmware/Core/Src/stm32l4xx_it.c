@@ -244,7 +244,7 @@ void ADC1_IRQHandler(void)
   HAL_ADC_IRQHandler(&hadc1);
   /* USER CODE BEGIN ADC1_IRQn 1 */
   adcOutput = HAL_ADC_GetValue(&hadc1);
-  HAL_ADC_Start_IT(&hadc1);
+//  HAL_ADC_Start_IT(&hadc1);
   /* USER CODE END ADC1_IRQn 1 */
 }
 

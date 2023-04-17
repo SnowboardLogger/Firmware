@@ -181,6 +181,8 @@ int main(void)
   HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
   HAL_ADC_Start_IT(&hadc1);
   //IMU_Config(&hi2c1);
+
+//  HD44780_PrintStr("hi");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -197,51 +199,55 @@ int main(void)
 	  			HD44780_PrintStr("Max Speed (mph):");
 	  			HD44780_SetCursor(1, 0);
 	  			sprintf(temp, "%f", recordedData.maxSpeed);
-	  			HD44780_PrintStr("                ");
+//	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
+	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case alt:
 	  			HD44780_PrintStr("Max Alt. (m):   ");
 	  			HD44780_SetCursor(1, 0);
 	  			sprintf(temp, "%f", recordedData.maxAltitude);
-	  			HD44780_PrintStr("                ");
+//	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
+	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case longest:
 	  			HD44780_PrintStr("Longest Run (m):");
 	  			HD44780_SetCursor(1, 0);
 	  			sprintf(temp, "%f", recordedData.longestRun);
-	  			HD44780_PrintStr("                ");
+//	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
+	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case tallest:
 	  			HD44780_PrintStr("Tallest Run (m):");
 	  			HD44780_SetCursor(1, 0);
 	  			sprintf(temp, "%f", recordedData.tallestRun);
-	  			HD44780_PrintStr("                ");
+//	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
+	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case steepest:
 	  			HD44780_PrintStr("Steepest (deg): ");
 				HD44780_SetCursor(1, 0);
 				sprintf(temp, "%f", recordedData.steepestRun);
-				HD44780_PrintStr("                ");
+//				HD44780_PrintStr("                ");
 				HD44780_PrintStr(temp);
+				HD44780_PrintStr("        ");
 				break;
 	  		case startLog:
 	  			HD44780_PrintStr("Starting log    ");
 	  			HD44780_SetCursor(1, 0);
 	  			HD44780_PrintStr("                ");
 	  			// delay - while gps !connected
-	  			// TODO This should timeout using a timer
-	  			/* uint8_t count = 0;
-	  			 * while (gps_data.fix != 1) {
-	  			 *	++count;
-	  			 * }
-	  			 *
-	  			 * state = (count >= 1000000) ? stopLog : prevState;
-	  			 */
-	  			state = prevState;
+	  			uint32_t ct = 0;
+	  			while (GPSData.fix != 1) {
+	  				++ct;
+	  				if (ct >= 40000000) {
+	  					break;
+	  				}
+	  			}
+	  			state = (ct >= 100000) ? stopLog : prevState;
 	  			break;
 	  		case stopLog:
 	  			HD44780_PrintStr("Stopping log    ");
@@ -273,13 +279,23 @@ int main(void)
 	  			state = prevState;
 	  			break;
 	  		case battery:
+	  			HAL_ADC_Start_IT(&hadc1);
+	  			HAL_Delay(50);
 	  			temperature = IMU_GET_TEMP(&hi2c1);
-	  			batteryPercentage = getBatteryPercentage(temperature,adcOutput);
-	  			HD44780_PrintStr("Battery %:      ");
-	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", batteryPercentage);
-	  			HD44780_PrintStr("                ");
+	  			batteryPercentage = getBatteryPercentage(temperature, adcOutput);
+	  			HD44780_PrintStr("Battery %: ");
+//	  			HD44780_SetCursor(1, 0);
+	  			sprintf(temp, "%.1f", batteryPercentage);
+//	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
+	  			HD44780_SetCursor(0, 15);
+	  			HD44780_PrintStr("%");
+	  			HD44780_SetCursor(1, 0);
+	  			HD44780_PrintStr("Temp. (C): ");
+	  			sprintf(temp, "%.1f", temperature);
+	  			HD44780_PrintStr(temp);
+	  			HD44780_SetCursor(0, 15);
+				HD44780_PrintStr("C");
 	  			break;
 	  		default:
 	  			HD44780_PrintStr("Error           ");
