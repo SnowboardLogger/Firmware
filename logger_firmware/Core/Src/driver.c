@@ -46,70 +46,70 @@ void btnFourIRQ(screenStates* state, screenStates* prevState) {
 	}
 }
 
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
 			*prevState = *state;
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		case alt:
 			*prevState = *state;
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		case longest:
 			*prevState = *state;
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		case tallest:
 			*prevState = *state;
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		case steepest:
 			*prevState = *state;
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		case startLog:
-			*isLogging = 1;
+			isLogging = 1;
 			break;
 		case stopLog:
-			*isLogging = 0;
+			isLogging = 0;
 			break;
 		case pauseLog:
-			*isLogging = 0;
+			isLogging = 0;
 			*state = stopLog;
 			break;
 		case resumeLog:
-			*isLogging = 0;
+			isLogging = 0;
 			*state = stopLog;
 			break;
 		case save:
 			break;
 		case battery:
-			*state = *isLogging ? stopLog : startLog;
+			*state = isLogging ? stopLog : startLog;
 			break;
 		default:
 			break;
 	}
 }
 
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
-			*state = *isLogging ? pauseLog : battery;
+			*state = isLogging ? pauseLog : battery;
 			break;
 		case alt:
-			*state = *isLogging ? pauseLog : battery;
+			*state = isLogging ? pauseLog : battery;
 			break;
 		case longest:
-			*state = *isLogging ? pauseLog : battery;
+			*state = isLogging ? pauseLog : battery;
 			break;
 		case tallest:
-			*state = *isLogging ? pauseLog : battery;
+			*state = isLogging ? pauseLog : battery;
 			break;
 		case steepest:
-			*state = *isLogging ? pauseLog : battery;
+			*state = isLogging ? pauseLog : battery;
 			break;
 		case startLog:
 			*state = pauseLog;
@@ -160,7 +160,6 @@ void swap(float* xp, float* yp){
 
 
 void parseGps(gpsData *data, char inputBuffer[]){
-
 	int dataElementIndex = 0;
 	int dataElementNum = 0;
 	int timeCount = 0;
@@ -442,7 +441,7 @@ void parseGps(gpsData *data, char inputBuffer[]){
 	}
 }
 
-void stopGPS(UART_HandleTypeDef *huart1){
+void stopGPS(UART_HandleTypeDef *huart1) {
 	//$PMTK161,0*28<CR><LF>
 	//Put GPS into standby, power saving mode
 	char inputBuffer[] = "$PMTK161,0*28\r\n";
@@ -480,10 +479,70 @@ void determineMax(gpsData* GPSData, Log* Log) {
 	Log->maxAltitude = (alt > Log->maxAltitude && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? alt : Log->maxAltitude;
 }
 
+uint16_t calcCheckSum(gpsData *data){
+	int i = 1;
+	char letter = *(data->dataBuffer);
+	uint16_t sum = 0;
+
+	while(letter != '*'){
+
+		letter = *(data->dataBuffer+i);
+
+		if(letter != '$' && letter != '*'){
+			sum = sum ^ letter;
+		}
+
+		++i;
+	}
+	return sum;
+}
+
+void checkRunStatus(gpsData* data, runData* run_data) {
+	if(runStatus == running && data->speedMph <= THRESHOLD_SPEED){
+			if(firstTimeOver == 0) {
+				//Keep track of the time when we first stopped
+				stopStartTimeInSecs = data->timeInSecs;
+				++firstTimeOver;
+			}
+
+			//Stopped for 15 seconds
+			if(data->timeInSecs - stopStartTimeInSecs >= 15){
+				run_data->stopAlt =data->altitude;
+				run_data->stopLat = data->latitude;
+				run_data->stopLong = data->longitude;
+				runStatus = notRunning;
+			}
+
+		} else if(runStatus == running && data->speedMph > THRESHOLD_SPEED){
+			firstTimeOver = 0;
+			//Moving right now so reset firstTimeOver because we didn't stay in place for 15 secs
+		}
+
+		if((runStatus == notRunning && data->speedMph > THRESHOLD_SPEED) || (data->speedMph >= 15)){
+			if(firstTimeOver == 0){
+				//Keep track of the time when we first started moving
+				runStartTimeInSecs = data->timeInSecs;
+				++firstTimeOver;
+			}
+
+			//Moving for 7 seconds
+			if(data->timeInSecs - runStartTimeInSecs >= 7 || (data->speedMph >= 15)){
+				run_data->startAlt = data->altitude;
+				run_data->startLat = data->latitude;
+				run_data->startLong = data->longitude;
+				runStatus = running;
+			}
+
+		} else if(runStatus == notRunning && data->speedMph <= THRESHOLD_SPEED){
+			firstTimeOver = 0;
+			//Stopped right now so reset firstTimeOver
+		}
+}
+
  // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}
 
 // Bluetooth Functions
-void btSendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size) {
+void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size) {
 	HAL_UART_Transmit(huart2, str, size, 1000);
 }
 
@@ -800,6 +859,46 @@ float IMU_GET_TEMP(I2C_HandleTypeDef* hi2c1) {
 	return (( (float) buf[0] - 21.6) * 9 / 5) + 32;
 }
 
+float IMU_GET_ROLL(I2C_HandleTypeDef* hi2c1) {
+	uint8_t buf[2];
+	buf[0] = EUL_ROLL_LSB;
+	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+	HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+	uint16_t MeasRoll = buf[0] | (buf[1] << 8); // ROLL
+
+	float CalcRoll = (float) MeasRoll / 16.0;
+	return CalcRoll;
+}
+
+void IMU_Determine_Max_Slope(I2C_HandleTypeDef* hi2c1, float curSlope, float prevSlope, Log* log) {
+	if (fabsf(curSlope - prevSlope) < 5) {
+		if (curSlope < 90 || curSlope >= 0) {
+			log->steepestRun = (curSlope > log->steepestRun) ? curSlope : log->steepestRun;
+		}
+	}
+}
+
+float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1) {
+	HAL_Delay(100);
+	uint8_t buf[2];
+	float orgDegPos = 0;
+	// Configure the IMU settings
+	uint16_t avg = 0;
+	while (avg < 100) {
+		buf[0] = EUL_ROLL_LSB;
+		HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 1, 1000);
+		HAL_I2C_Master_Receive(hi2c1, I2C_Addr, &buf[0], 2, 1000);
+		int16_t MeaSlope = buf[0] | (buf[1] << 8); // ROLL
+
+		float CalcSlope = (float) MeaSlope / 16.0;
+
+		orgDegPos += CalcSlope;
+		avg++;
+	}
+
+	return orgDegPos / 100;
+}
+
 void IMU_PRINT_DATA(I2C_HandleTypeDef* hi2c1, float* Data[]) {
 	printf("%f %f %f \n\r", *Data[0], *Data[1], *Data[2]);
 }
@@ -955,21 +1054,24 @@ void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type) {
 	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
 }
 
-void sdTest(Log* log) {
+uint8_t SD_write(Log* log) {
 
 	  FATFS       FatFs;                //Fatfs handle
 	  FIL         fil;                  //File handle
 	  FRESULT     fres;                 //Result after operations
 
+	  // Mount and open SD card
 	  fres = f_mount(&FatFs, "", 1);    //1=mount now
 	  if (fres != FR_OK) {
-		return;
+		  f_close(&fil);
+		  f_mount(NULL, "", 0);
+		  return 0;
 	  }
-
 	  fres = f_open(&fil, "logs.txt", FA_WRITE | FA_OPEN_ALWAYS);
 	  if (fres != FR_OK) {
-//		  state = error;
-		  return;
+		  f_close(&fil);
+		  f_mount(NULL, "", 0);
+		  return 0;
 	  }
 	  char t[100];
 
@@ -995,40 +1097,42 @@ void sdTest(Log* log) {
 
 	  f_puts("\n", &fil);
 
-	  for (uint8_t i = 0; i < log->numberOfRuns; ++i) {
+//	  for (uint8_t i = 0; i < log->numberOfRuns; ++i) {
+	  for (uint8_t i = 0; i < 3; ++i) {
 
-	   	f_puts("\trun ", &fil);
+	   	f_puts("run ", &fil);
 	   	sprintf(t, "%i", i);
 		f_puts(t, &fil);
 	   	f_puts(" - ", &fil);
 
 	 	f_puts(" elapsed time: ", &fil);
-	    	sprintf(t, "%i", log->run[i].elapsedTime);
-	  	f_puts(t, &fil);
+		sprintf(t, "%i", log->run[i].elapsedTime);
+		f_puts(t, &fil);
 
-	    	f_puts(" | vert dist: ", &fil);
-	    	sprintf(t, "%i", log->run[i].verticalDistance);
-	    	f_puts(t, &fil);
+		f_puts(" | vert dist: ", &fil);
+		sprintf(t, "%i", log->run[i].verticalDistance);
+		f_puts(t, &fil);
 
-	    	f_puts(" | horiz dist: ", &fil);
-	    	sprintf(t, "%i", log->run[i].horizontalDistance);
-	    	f_puts(t, &fil);
+		f_puts(" | horiz dist: ", &fil);
+		sprintf(t, "%i", log->run[i].horizontalDistance);
+		f_puts(t, &fil);
 
-	    	f_puts(" | avg speed: ", &fil);
-	    	sprintf(t, "%i", log->run[i].averageSpeed);
-	    	f_puts(t, &fil);
+		f_puts(" | avg speed: ", &fil);
+		sprintf(t, "%i", log->run[i].averageSpeed);
+		f_puts(t, &fil);
 
 		f_puts(" | num points: ", &fil);
-	    	sprintf(t, "%i", log->run[i].numberOfPoints);
-	    	f_puts(t, &fil);
+		sprintf(t, "%i", log->run[i].numberOfPoints);
+		f_puts(t, &fil);
 
 		f_puts("\n", &fil);
 
-		for (uint8_t j = 0; j < log->run[i].numberOfPoints; ++j) {
+//		for (uint8_t j = 0; j < log->run[i].numberOfPoints; ++j) {
+		for (uint8_t j = 0; j < 20; ++j) {
 
-			f_puts("\t\tdata point ", &fil);
-	    		sprintf(t, "%d", j);
-	    		f_puts(t, &fil);
+			f_puts("\tdata point ", &fil);
+			sprintf(t, "%i", j);
+			f_puts(t, &fil);
 			f_puts(" - ", &fil);
 
 			f_puts(" speed: ", &fil);
@@ -1051,44 +1155,96 @@ void sdTest(Log* log) {
 
 		}
 
-//		for (uint8_t k = 0; k < 6000; ++k) {
-//			f_puts("\t\t ", &fil);
-//			for (uint8_t a = 0; a < 3; ++a) {
-//				sprintf(t, "%f", log->run[i].IMUspeed[k][a]);
-//	    			f_puts(t, &fil);
-//				f_puts(", ", &fil);
-//			}
-//			f_puts("\n", &fil);
-//		}
-
 	   }
+
+	  // Close and eject SD card
 	  f_close(&fil);
 	  f_mount(NULL, "", 0);
+	  return 1;
 }
 
 float getBatteryPercentage(float temp, uint32_t adcVal){
-	int batteryCalcMatrix[3][2] = {{5,2},{-5,5},{-100,10}}; //each row is a temp band, going lowest to highest
+	static int batteryCalcMatrix[3][2] = {{5,2},{-5,5},{-100,10}}; //each row is a temp band, going lowest to highest
 	float delta = 2.0f*((adcVal+350)*2.0/2260.0) - 2.8;
 //	float delta = (adcVal*2)/2260.0;
 	float percentage = -999;
 	if(delta <= 0){
 		percentage = 0;
-		return percentage;
 	}
 	else if(delta >=1.2f){
 		percentage = 100;
-		return percentage;
 	}
-	for(int i = 0; i < 3; i++){
-		if(temp > batteryCalcMatrix[i][0]){
-			if(delta <= 0.2f){
-				percentage = batteryCalcMatrix[i][1]*(delta/0.2);
-			}
-			else{
-				percentage = (100.0 - batteryCalcMatrix[i][1])*(delta - 0.2) + batteryCalcMatrix[i][1];
+	else{
+		for(int i = 0; i < 3; i++){
+			if(temp > batteryCalcMatrix[i][0]){
+				if(delta <= 0.2f){
+					percentage = batteryCalcMatrix[i][1]*(delta/0.2);
+				}
+				else{
+					percentage = (100.0 - batteryCalcMatrix[i][1])*(delta - 0.2) + batteryCalcMatrix[i][1];
+				}
 			}
 		}
 	}
+	int bufferSize = 5;
+	static float percAvgBuffer[bufferSize];
+	for(int i = 1; i < bufferSize; i++){
+		percAvgBuffer[i-1]=percAvgBuffer[i];
+	}
+	percAvgBuffer[bufferSize] = percentage;
+	float percentFiltered;
+	for(int i = 0; i < bufferSize; i++){
+		percentFiltered += (percAvgBuffer[i])/((float)bufferSize);
+	}
+	return percentFiltered;
+}
 
-	return percentage;
+// State Control
+void switchToErrorState(screenStates* s) {
+	*s = error;
+}
+
+void LCD_printFlt(float data) {
+  	char temp[16];
+	sprintf(temp, "%f", data);
+	HD44780_PrintStr(temp);
+	HD44780_PrintStr("                ");
+}
+
+void LCD_printFltDecLim(float data) {
+  	char temp[16];
+	sprintf(temp, "%.1f", data);
+	HD44780_PrintStr(temp);
+}
+
+uint8_t readSDsendBT(UART_HandleTypeDef *huart2) {
+	FATFS       FatFs;                //Fatfs handle
+	FIL         fil;                  //File handle
+	FRESULT     fres;                 //Result after operations
+
+	// Mount and open SD card
+	fres = f_mount(&FatFs, "", 1);    //1=mount now
+	if (fres != FR_OK) {
+		f_close(&fil);
+		f_mount(NULL, "", 0);
+		return 0;
+	}
+	fres = f_open(&fil, "logs.txt", FA_READ);
+	if (fres != FR_OK) {
+		f_close(&fil);
+		f_mount(NULL, "", 0);
+		return 0;
+	}
+
+	char buf[181120];
+
+	f_gets(buf, sizeof(buf), &fil);
+
+	BT_sendData(huart2, &buf, sizeof(buf));
+
+	// Close and eject SD card
+	f_close(&fil);
+	f_mount(NULL, "", 0);
+	return 1;
+
 }
