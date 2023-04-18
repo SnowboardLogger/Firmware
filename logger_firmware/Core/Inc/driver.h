@@ -16,6 +16,9 @@ extern "C" {
 
 extern volatile uint8_t buzEnable;
 
+extern volatile char gpsDataBuffer[100];//max chars of 70 from gpgga
+extern volatile int gpsParseFlag;
+
 typedef struct {
 	int hours;
 	char hoursChar[8];
@@ -25,16 +28,13 @@ typedef struct {
 	char secsChar[8];
 	float timeInSecs;
 
-	volatile char dataBuffer[100];//max chars of 70 from gpgga
-	volatile int bufferIndex;
-
 	char latitudeChar[15];
-	float latitude;
+	float latitude[2];
 
 	char latDir;//N or S
 
 	char longitudeChar[15];
-	float longitude;
+	float longitude[2];
 
 	char longDir;//E or W
 
@@ -46,7 +46,7 @@ typedef struct {
 	float hdop;//Horizontal Dilution of Precision
 	char hdopChar[8];
 
-	float altitude;
+	float altitude[3];
 	char altitudeChar[8];
 
 	char altitudeUnits;//M = meters
@@ -55,12 +55,12 @@ typedef struct {
 	char validity;
 
 	char speedCharKnots[10];
-	float speedMph;
+	float speedMph[3];
 
-	char checksumgga[6];
+	char checksumgga[3];
 	int ggaGood;
 
-	char checksumrmc[6];
+	char checksumrmc[3];
 	int rmcGood;
 } gpsData;
 
@@ -316,7 +316,7 @@ void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isL
 void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
 
 // GPS Stuff
-void parseGps(gpsData *data);
+void parseGps(gpsData *data, char dataBuffer[]);
 void determineMax(gpsData* GPSData, Log* Log);
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef huart1);
 float calcDistance(float lat1, float long1, float lat2, float long2);

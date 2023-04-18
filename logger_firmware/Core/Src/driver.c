@@ -132,14 +132,14 @@ void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* i
 	}
 }
 
-uint16_t calcCheckSum(gpsData *data){
+uint16_t calcCheckSum(char buffer[100]){
 	int i = 1;
-	char letter = *(data->dataBuffer);
+	char letter = *(buffer);
 	uint16_t sum = 0;
 
 	while(letter != '*'){
 
-		letter = *(data->dataBuffer+i);
+		letter = *(buffer+i);
 
 		if(letter != '$' && letter != '*'){
 			sum = sum ^ letter;
@@ -150,7 +150,16 @@ uint16_t calcCheckSum(gpsData *data){
 	return sum;
 }
 
-void parseGps(gpsData *data){
+void swap(float* xp, float* yp){
+	//Adapted from GeeksForGeeks
+    float temp = *xp;
+    *xp = *yp;
+    *yp = temp;
+}
+
+
+
+void parseGps(gpsData *data, char inputBuffer[]){
 
 	int dataElementIndex = 0;
 	int dataElementNum = 0;
@@ -159,7 +168,7 @@ void parseGps(gpsData *data){
 	char dataType[7] = "XXXXXX";
 
 	for(uint8_t i = 0; i < BUFFER_SIZE; ++i){
-		char letter = *(data->dataBuffer+i);
+		char letter = *(inputBuffer+i);
 
 		if(letter == ','){
 			++dataElementNum;
@@ -200,7 +209,7 @@ void parseGps(gpsData *data){
 				}else if(timeCount > 3){
 					data->secsChar[dataElementIndex] = letter;
 					++dataElementIndex;
-					if (*(data->dataBuffer+i+1) == ','){
+					if (*(inputBuffer+i+1) == ','){
 						data->secs = strtof(data->secsChar, NULL);
 						dataElementIndex = 0;
 						data->timeInSecs = data->secs + (data->mins * 60) + (data->hours * 24 * 60);
@@ -213,27 +222,33 @@ void parseGps(gpsData *data){
 			} else if (dataElementNum == 2 ){
 				data->latitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
-					data->latitude = strtof(data->latitudeChar, NULL);
+				if(*(inputBuffer+i+1) == ','){
+					data->latitude[0] = data->latitude[1];
+					data->latitude[1] = strtof(data->latitudeChar, NULL);
 				}
 
 			} else if (dataElementNum == 3){
 				data->latDir = letter;
 				if(data->latDir == 'W'){
-					data->latitude *= -1;
+					data->latitude[1] *= -1;
 				}
 
 			} else if (dataElementNum == 4){
 				data->longitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
-					data->longitude = strtof(data->longitudeChar, NULL);
+				if(*(inputBuffer+i+1) == ','){
+					data->longitude[0] = data->longitude[1];
+					data->longitude[1] = strtof(data->longitudeChar, NULL);
 				}
 
 			} else if (dataElementNum == 5){
 				data->longDir = letter;
 				if(data->longDir == 'S'){
-					data->longitude *= -1;
+					data->longitude[1] *= -1;
+
+					data->speedMph[0] = data->speedMph[1];
+					data->speedMph[1] = data->speedMph[2];
+					data->speedMph[2] = (calcDistance(data->latitude[0], data->longitude[0],data->latitude[1], data->longitude[1])/3)*2.237;//m/s->mph
 				}
 
 			} else if (dataElementNum == 6){
@@ -242,44 +257,68 @@ void parseGps(gpsData *data){
 			} else if (dataElementNum == 7){
 				data->numSatellitesChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					data->numSatellites = atoi(data->numSatellitesChar);
 				}
 
 			} else if (dataElementNum == 8){
 				data->hdopChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					data->hdop = strtof(data->hdopChar, NULL);
 				}
 
 			} else if (dataElementNum == 9){
 				data->altitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					float alt = strtof(data->altitudeChar, NULL);
 
 					//Either we are on a plane or this is wrong because mt everest is 8849 M tall rn
-					if(alt <= 8900){
-						data->altitude = alt;
+					if(alt <= 8900 ){
+						//Make sure this value isn't already in the array
+						if(alt != data->altitude[2] && alt != data->altitude[1] && alt != data->altitude[0]){
+							//Init the array with first alt for median
+							if(data->altitude[2] == 0){
+								data->altitude[0] = alt;
+								data->altitude[1] = alt;
+								data->altitude[2] = alt;
+							}
+							swap(&data->altitude[1], &data->altitude[0]);
+							swap(&data->altitude[2], &data->altitude[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->altitude[2] = alt;
+						}
 					}else {
-						data->altitude = -1;
+						if(alt != data->altitude[2] && alt != data->altitude[1] && alt != data->altitude[0]){
+							if(data->altitude[2] == 0){
+								data->altitude[0] = -1;
+								data->altitude[1] = -1;
+								data->altitude[2] = -1;
+							}
+							swap(&data->altitude[1], &data->altitude[0]);
+							swap(&data->altitude[2], &data->altitude[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->altitude[2] = -1;
+						}
 					}
 				}
 
 			} else if (dataElementNum == 10){
 				data->altitudeUnits = letter;
 
-			} else if (dataElementNum == 14){
+			} /*else if (dataElementNum == 14){
 
 				//ignore the *
 				if(letter != '*' && letter != '\r' && letter != '\n'){
 					data->checksumgga[dataElementIndex] = letter;
 					++dataElementIndex;
+				}else if (letter == '*'){
+					dataElementIndex = 0;
 				}
 
 				if(dataElementIndex == 2){
-					uint16_t check = calcCheckSum(&data);
+					uint16_t check = calcCheckSum(inputBuffer);
 					char checkHex[3];
 					sprintf(checkHex, "%02X", check);
 
@@ -292,39 +331,80 @@ void parseGps(gpsData *data){
 
 				}
 
+			}*/
+			if(letter == '*'){
+				data->checksumgga[0] = *(inputBuffer+i+1);
+				data->checksumgga[1] = *(inputBuffer+i+2);
+
+				uint16_t check = calcCheckSum(inputBuffer);
+				char checkHex[3];
+				sprintf(checkHex, "%02X", check);
+
+				if(strcmp(data->checksumgga, checkHex)==0){
+					//data is good
+					data->ggaGood = 1;
+				}else {
+					data->ggaGood = 0;
+				}
 			}
 
-		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
+		} /*else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
 			if (dataElementNum == 2){
 				data->validity = letter;
 
 			} else if (dataElementNum == 7){
 				data->speedCharKnots[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					float speed = 1.15077945 * strtof(data->speedCharKnots, NULL);
 
 
-					//Either we are on a plane or this is wrong because the land speed record is 1200mph
-					if(speed <= 1200){
-						data->speedMph = speed;
+					//Either we are on a military jet or this is wrong because the land speed record is 1200mph and jetliners fly at like 600-800mph
+					if(speed <= 100){
+						if(speed != data->speedMph[2] && speed != data->speedMph[1] && speed != data->speedMph[0]){
+							//Init 0 and 1 to the first speed so median works good
+							if(data->speedMph[2] == 0){
+								data->speedMph[0] = speed;
+								data->speedMph[1] = speed;
+								data->speedMph[2] = speed;
+							}
+
+							swap(&data->speedMph[1], &data->speedMph[0]);
+							swap(&data->speedMph[2], &data->speedMph[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->speedMph[2] = speed;
+						}
+
 					}else {
-						data->speedMph = -1;
+						if(speed != data->speedMph[2] && speed != data->speedMph[1] && speed != data->speedMph[0]){
+							if(data->speedMph[2] == 0){
+								data->speedMph[0] = -1;
+								data->speedMph[1] = -1;
+								data->speedMph[2] = -1;
+							}
+
+							swap(&data->speedMph[1], &data->speedMph[0]);
+							swap(&data->speedMph[2], &data->speedMph[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->speedMph[2] = -1;
+						}
 					}
 
 
 				}
 
-			} else if (dataElementNum == 11){
+			} /*else if (dataElementNum == 12){
 
 				//ignore the *
 				if(letter != '*' && letter != '\r' && letter != '\n'){
 					data->checksumrmc[dataElementIndex] = letter;
 					++dataElementIndex;
+				}else if (letter == '*'){
+					dataElementIndex = 0;
 				}
 
 				if(dataElementIndex == 2){
-					uint16_t check = calcCheckSum(&data);
+					uint16_t check = calcCheckSum(inputBuffer);
 					char checkHex[3];
 					sprintf(checkHex, "%02X", check);
 
@@ -338,7 +418,23 @@ void parseGps(gpsData *data){
 				}
 
 			}
-		}
+			if(letter == '*'){
+				data->checksumrmc[0] = *(inputBuffer+i+1);
+				data->checksumrmc[1] = *(inputBuffer+i+2);
+
+				uint16_t check = calcCheckSum(inputBuffer);
+				char checkHex[3];
+				sprintf(checkHex, "%02X", check);
+
+				if(strcmp(data->checksumrmc, checkHex)==0){
+					//data is good
+					data->rmcGood = 1;
+				}else {
+					data->rmcGood = 0;
+				}
+			}
+		}*/
+
 
 		if(letter == '\n' || letter == '\r'){
 			break;
@@ -359,9 +455,29 @@ void startGPS(UART_HandleTypeDef *huart1){
 	HAL_UART_Transmit(huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 }
 
+void bubbleSort(float arr[], int n){
+	//sort (bubble)
+	//Paraphrased from GeeksForGeeks
+	for(uint8_t i = 0; i < 2; ++i){
+		for(int j = 0; j < 1; ++j){
+			if(arr[j] > arr[j+1]){
+				swap(&arr[j], &arr[j+1]);
+			}
+		}
+	}
+}
+
+float medianThree(float nums[3]){
+	bubbleSort(nums, 3);
+	return nums[1];
+}
+
 void determineMax(gpsData* GPSData, Log* Log) {
-	Log->maxSpeed = (GPSData->speedMph > Log->maxSpeed) && (GPSData->speedMph - Log->maxSpeed < 50) ? GPSData->speedMph : Log->maxSpeed;
-	Log->maxAltitude = (GPSData->altitude > Log->maxAltitude) && (GPSData->altitude - Log->maxAltitude < 25) ? GPSData->altitude : Log->maxAltitude;
+	float speed = medianThree(GPSData->speedMph);
+	Log->maxSpeed = (speed > Log->maxSpeed && GPSData->rmcGood == 1 && GPSData->numSatellites >= 4) ? speed : Log->maxSpeed;
+
+	float alt = medianThree(GPSData->altitude);
+	Log->maxAltitude = (alt > Log->maxAltitude && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? alt : Log->maxAltitude;
 }
 
  // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}

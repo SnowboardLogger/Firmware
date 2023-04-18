@@ -49,8 +49,13 @@ extern screenStates prevState; // Same issue as state
 extern volatile uint8_t isLogging;
 extern volatile uint8_t buzEnable; // Buzzer Enable
 extern volatile uint8_t IMU_DATA_FLAG;
+
 extern volatile gpsData GPSData;
+extern volatile char gpsDataBuffer[100];//max chars of 70 from gpgga
+volatile int gpsBufferIndex;
 extern volatile char bufferByte[1];
+extern volatile int gpsParseFlag;
+
 uint32_t counter = 0;
 uint32_t timer6 = 0;
 volatile uint32_t buttonCounter = 0;
@@ -301,20 +306,26 @@ void TIM1_UP_TIM16_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-
+	bufferByte[0] = 0;
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-  	if (GPSData.bufferIndex < BUFFER_SIZE){
-		GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
-	} else {
+  	//if (GPSData.bufferIndex < BUFFER_SIZE){
+		//GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
+  	  gpsDataBuffer[gpsBufferIndex] = *bufferByte;
+  	++gpsBufferIndex;
+	/*} else {
 		GPSData.bufferIndex = 0;
-	}
+	}*/
 
 	if(*bufferByte == '\n'){
-		GPSData.bufferIndex = 0;
+		//GPSData.bufferIndex = 0;
+		gpsBufferIndex = 0;
+		gpsParseFlag = 1;
 	}
-  HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
+
+	HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
+
   /* USER CODE END USART1_IRQn 1 */
 }
 

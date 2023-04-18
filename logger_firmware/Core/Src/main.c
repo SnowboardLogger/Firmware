@@ -76,6 +76,9 @@ volatile uint32_t adcOutput;
 volatile float batteryPercentage;
 volatile float temperature = 10;
 
+volatile char gpsDataBuffer[100]="ASDFADFHDFGASDFASDFSDFHDASDF";//dataBuffer
+volatile int gpsParseFlag = 0;
+
 volatile gpsData GPSData = {
 		  0,
 		  "hh",
@@ -84,25 +87,23 @@ volatile gpsData GPSData = {
 		  0,
 		  "ss.ss",
 		  0,
-		  "ASDFADFHDFGASDFASDFSDFHDASDF", //dataBuffer
-	  	  0,//bufferIndex
 		  "lllll.ll",//latitudeChar[]
-		  0,//latitude
+		  {0,0},//latitude
 		  'A',//latDir
 		  "yyyyy.yy",//longitudeChar
-		  0,//longitude
+		  {0,0},//longitude
 		  'A',//longDir
 		  0,//fix
 		  0,//numSatellites
 		  "xxx",//numSatellitesChar
 		  0,//hdop
 		  "x.x",//hdopChar[]
-		  0,//altitude
+		  {0,0,0},//altitude
 		  "x.x",//altitudeChar[]
 		  'M',//altitudeUnits
 		  'V',//validity
 		  "xxx",//speedCharKnots
-		  0, //speedMph
+		  {0,0,0}, //speedMph
 		  "0",//checksumgga
 		  0,//dataGoodgga
 		  "0",//checksumrmc
@@ -175,9 +176,11 @@ int main(void)
   HD44780_NoBlink(); // Don't blink cursor
   HD44780_NoCursor(); // Don't show cursor
 
+  memset(&recordedData, 0, sizeof(recordedData));
+
   //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
   	//data on the GPS
-  	char inputBuffer[] = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n";
+  	char inputBuffer[] = "$PMTK314,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n";
   	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
   	//Change GPS update frequency to every 3000 milliseconds
@@ -202,9 +205,15 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  parseGps(&GPSData);
-	  //Add Check Run Status here
+	  if(gpsParseFlag == 1){
+		  parseGps(&GPSData, gpsDataBuffer);
+
+		  //Add Check Run Status here
+		  gpsParseFlag = 0;
+	  }
 	  determineMax(&GPSData, &recordedData);
+
+
 
 	  HD44780_SetCursor(0, 0);
 	  	char temp[16];
@@ -226,25 +235,29 @@ int main(void)
 	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case longest:
-	  			HD44780_PrintStr("Longest Run (m):");
+	  			//HD44780_PrintStr("Longest Run (m):");
+	  			HD44780_PrintStr("Current Speed:   ");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", recordedData.longestRun);
+	  			sprintf(temp, "%f", GPSData.speedMph[2]);
 //	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
 	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case tallest:
-	  			HD44780_PrintStr("Tallest Run (m):");
+	  			//HD44780_PrintStr("Tallest Run (m):");
+	  			HD44780_PrintStr("Current Alt:    ");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", recordedData.tallestRun);
+	  			sprintf(temp, "%f", GPSData.altitude[2]);
 //	  			HD44780_PrintStr("                ");
 	  			HD44780_PrintStr(temp);
 	  			HD44780_PrintStr("        ");
 	  			break;
 	  		case steepest:
-	  			HD44780_PrintStr("Steepest (deg): ");
+	  			//HD44780_PrintStr("Steepest (deg): ");
+	  			HD44780_PrintStr("numSatellites :    ");
 				HD44780_SetCursor(1, 0);
-				sprintf(temp, "%f", recordedData.steepestRun);
+				//sprintf(temp, "%f", recordedData.steepestRun);
+				sprintf(temp, "%u", GPSData.numSatellites);
 //				HD44780_PrintStr("                ");
 				HD44780_PrintStr(temp);
 				HD44780_PrintStr("        ");
