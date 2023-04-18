@@ -332,6 +332,10 @@ extern IMU_OFFSET offset_cal_data;
 // State Control
 void switchToErrorState(screenStates* s);
 
+// LCD Stuff
+void LCD_printFlt(float data);
+void LCD_printFltDecLim(float data);
+
 // Button Interrupt
 void btnFourIRQ(screenStates* state, screenStates* prevState);
 void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging);
@@ -348,8 +352,9 @@ void stopGPS(UART_HandleTypeDef* huart1);
 void startGPS(UART_HandleTypeDef* huart1);
 
 // Bluetooth Stuff
-void btSendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size);
+void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size);
 void printScreen(screenStates* s, Log* log);
+uint8_t readSDsendBT(UART_HandleTypeDef *huart2);
 
 // IMU Stuff
 void IMU_Config(I2C_HandleTypeDef* hi2c1);
@@ -369,7 +374,7 @@ float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1); // After this, de
 float getBatteryPercentage(float temp, uint32_t adcVal);
 
 // SD Card
-void sdTest(Log* log);
+uint8_t SD_write(Log* log);
 
 #ifdef __cplusplus
 }

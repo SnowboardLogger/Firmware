@@ -60,6 +60,8 @@ void Error_Handler(void);
 #define BT_UART_TX_GPIO_Port GPIOA
 #define BT_UART_RX_Pin GPIO_PIN_3
 #define BT_UART_RX_GPIO_Port GPIOA
+#define BatteryPercent_ADC_Pin GPIO_PIN_5
+#define BatteryPercent_ADC_GPIO_Port GPIOA
 #define SD_SPI_MISO_Pin GPIO_PIN_6
 #define SD_SPI_MISO_GPIO_Port GPIOA
 #define SD_SPI_MOSI_Pin GPIO_PIN_7
