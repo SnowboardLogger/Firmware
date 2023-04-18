@@ -46,70 +46,77 @@ void btnFourIRQ(screenStates* state, screenStates* prevState) {
 	}
 }
 
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case alt:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case longest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case tallest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case steepest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case startLog:
-			isLogging = 1;
+			*isLogging = 1;
+//			*state = *prevState;
 			break;
 		case stopLog:
-			isLogging = 0;
+			*isLogging = 0;
 			break;
 		case pauseLog:
-			isLogging = 0;
+			*isLogging = 0;
 			*state = stopLog;
 			break;
 		case resumeLog:
-			isLogging = 0;
+			*isLogging = 0;
 			*state = stopLog;
 			break;
 		case save:
 			break;
 		case battery:
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		default:
 			break;
 	}
 }
 
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case alt:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case longest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case tallest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case steepest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case startLog:
 			*state = pauseLog;
@@ -132,8 +139,16 @@ void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t is
 	}
 }
 
-void parseGps(gpsData *data){
+void swap(float* xp, float* yp){
+	//Adapted from GeeksForGeeks
+    float temp = *xp;
+    *xp = *yp;
+    *yp = temp;
+}
 
+
+
+void parseGps(gpsData *data, char inputBuffer[]) {
 	int dataElementIndex = 0;
 	int dataElementNum = 0;
 	int timeCount = 0;
@@ -141,7 +156,7 @@ void parseGps(gpsData *data){
 	char dataType[7] = "XXXXXX";
 
 	for(uint8_t i = 0; i < BUFFER_SIZE; ++i){
-		char letter = *(data->dataBuffer+i);
+		char letter = *(inputBuffer+i);
 
 		if(letter == ','){
 			++dataElementNum;
@@ -182,7 +197,7 @@ void parseGps(gpsData *data){
 				}else if(timeCount > 3){
 					data->secsChar[dataElementIndex] = letter;
 					++dataElementIndex;
-					if (*(data->dataBuffer+i+1) == ','){
+					if (*(inputBuffer+i+1) == ','){
 						data->secs = strtof(data->secsChar, NULL);
 						dataElementIndex = 0;
 						data->timeInSecs = data->secs + (data->mins * 60) + (data->hours * 24 * 60);
@@ -195,28 +210,41 @@ void parseGps(gpsData *data){
 			} else if (dataElementNum == 2 ){
 				data->latitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
-					data->latitude = strtof(data->latitudeChar, NULL);
+				if(*(inputBuffer+i+1) == ','){
+					data->latitude[0] = data->latitude[1];
+					float tempLat = (strtof(data->latitudeChar, NULL))/100.0;
+					float degL = (float)((int)tempLat);
+					degL += (tempLat - (float)degL)*10/6;
+					data->latitude[1] = tempLat;
 				}
 
 			} else if (dataElementNum == 3){
 				data->latDir = letter;
-				if(data->latDir == 'W'){
-					data->latitude *= -1;
+				if(data->latDir == 'S'){
+					data->latitude[1] *= -1;
 				}
 
 			} else if (dataElementNum == 4){
 				data->longitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
-					data->longitude = strtof(data->longitudeChar, NULL);
+				if(*(inputBuffer+i+1) == ','){
+					data->longitude[0] = data->longitude[1];
+					float tempLong = (strtof(data->longitudeChar, NULL))/100.0;
+					float degO = (float)((int)tempLong);
+					degO += (tempLong - (float)degO)*10/6;
+					data->longitude[1] = tempLong;
 				}
 
 			} else if (dataElementNum == 5){
 				data->longDir = letter;
-				if(data->longDir == 'S'){
-					data->longitude *= -1;
+
+				if(data->longDir == 'W'){
+					data->longitude[1] *= -1;
 				}
+
+				(data->speedMph[0]) = (data->speedMph[1]);
+				(data->speedMph[1]) = (data->speedMph[2]);
+				(data->speedMph[2]) = (calcDistance(data->latitude[0], data->longitude[0],data->latitude[1], data->longitude[1])/3.0)*2.237;//m/s->mph
 
 			} else if (dataElementNum == 6){
 				data->fix = (uint8_t) (letter - '0');
@@ -224,44 +252,68 @@ void parseGps(gpsData *data){
 			} else if (dataElementNum == 7){
 				data->numSatellitesChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					data->numSatellites = atoi(data->numSatellitesChar);
 				}
 
 			} else if (dataElementNum == 8){
 				data->hdopChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					data->hdop = strtof(data->hdopChar, NULL);
 				}
 
 			} else if (dataElementNum == 9){
 				data->altitudeChar[dataElementIndex] = letter;
 				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
+				if(*(inputBuffer+i+1) == ','){
 					float alt = strtof(data->altitudeChar, NULL);
 
 					//Either we are on a plane or this is wrong because mt everest is 8849 M tall rn
-					if(alt <= 8900){
-						data->altitude = alt;
+					if(alt <= 8900 ){
+						//Make sure this value isn't already in the array
+						if(alt != data->altitude[2] && alt != data->altitude[1] && alt != data->altitude[0]){
+							//Init the array with first alt for median
+							if(data->altitude[2] == 0){
+								data->altitude[0] = alt;
+								data->altitude[1] = alt;
+								data->altitude[2] = alt;
+							}
+							swap(&data->altitude[1], &data->altitude[0]);
+							swap(&data->altitude[2], &data->altitude[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->altitude[2] = alt;
+						}
 					}else {
-						data->altitude = -1;
+						if(alt != data->altitude[2] && alt != data->altitude[1] && alt != data->altitude[0]){
+							if(data->altitude[2] == 0){
+								data->altitude[0] = -1;
+								data->altitude[1] = -1;
+								data->altitude[2] = -1;
+							}
+							swap(&data->altitude[1], &data->altitude[0]);
+							swap(&data->altitude[2], &data->altitude[1]);
+							//What was in [0] gets replaced by the new value in [2]
+							data->altitude[2] = -1;
+						}
 					}
 				}
 
 			} else if (dataElementNum == 10){
 				data->altitudeUnits = letter;
 
-			} else if (dataElementNum == 14){
+			} /*else if (dataElementNum == 14){
 
 				//ignore the *
 				if(letter != '*' && letter != '\r' && letter != '\n'){
 					data->checksumgga[dataElementIndex] = letter;
 					++dataElementIndex;
+				}else if (letter == '*'){
+					dataElementIndex = 0;
 				}
 
 				if(dataElementIndex == 2){
-					uint16_t check = calcCheckSum(data);
+					uint16_t check = calcCheckSum(inputBuffer);
 					char checkHex[3];
 					sprintf(checkHex, "%02X", check);
 
@@ -274,56 +326,22 @@ void parseGps(gpsData *data){
 
 				}
 
+			}*/
+			if(letter == '*'){
+				data->checksumgga[0] = *(inputBuffer+i+1);
+				data->checksumgga[1] = *(inputBuffer+i+2);
+
+				uint16_t check = calcCheckSum(inputBuffer);
+				char checkHex[3];
+				sprintf(checkHex, "%02X", check);
+
+				if(strcmp(data->checksumgga, checkHex)==0){
+					//data is good
+					data->ggaGood = 1;
+				}else {
+					data->ggaGood = 0;
+				}
 			}
-
-		} else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
-			if (dataElementNum == 2){
-				data->validity = letter;
-
-			} else if (dataElementNum == 7){
-				data->speedCharKnots[dataElementIndex] = letter;
-				++dataElementIndex;
-				if(*(data->dataBuffer+i+1) == ','){
-					float speed = 1.15077945 * strtof(data->speedCharKnots, NULL);
-
-
-					//Either we are on a plane or this is wrong because the land speed record is 1200mph
-					if(speed <= 1200){
-						data->speedMph = speed;
-					}else {
-						data->speedMph = -1;
-					}
-
-
-				}
-
-			} else if (dataElementNum == 11){
-
-				//ignore the *
-				if(letter != '*' && letter != '\r' && letter != '\n'){
-					data->checksumrmc[dataElementIndex] = letter;
-					++dataElementIndex;
-				}
-
-				if(dataElementIndex == 2){
-					uint16_t check = calcCheckSum(data);
-					char checkHex[3];
-					sprintf(checkHex, "%02X", check);
-
-					if(strcmp(data->checksumrmc, checkHex)==0){
-						//data is good
-						data->rmcGood = 1;
-					}else {
-						data->rmcGood = 0;
-					}
-
-				}
-
-			}
-		}
-
-		if(letter == '\n' || letter == '\r'){
-			break;
 		}
 	}
 }
@@ -341,14 +359,65 @@ void startGPS(UART_HandleTypeDef *huart1){
 	HAL_UART_Transmit(huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 }
 
-uint16_t calcCheckSum(gpsData *data){
+void bubbleSort(float arr[], int n){
+	//sort (bubble)
+	//Paraphrased from GeeksForGeeks
+	for(uint8_t i = 0; i < 2; ++i){
+		for(int j = 0; j < 1; ++j){
+			if(arr[j] > arr[j+1]){
+				swap(&arr[j], &arr[j+1]);
+			}
+		}
+	}
+}
+
+float medianThree(float nums[3]){
+	float median;
+	int maxIndex;
+	int medianIndex=2;
+	int minIndex;
+	float max = -100;
+	float min = 100;
+	for(int i = 0; i < 2; i++){
+		if(nums[i]>max){
+			max=nums[i];
+			maxIndex = i;
+		}
+		if(nums[i]<min){
+			min=nums[i];
+			minIndex = i;
+		}
+	}
+	for(int i = 0; i < 2; i++){
+		if(i != maxIndex && i != minIndex){
+			medianIndex = i;
+		}
+	}
+	return nums[medianIndex];
+}
+
+void determineMax(gpsData* GPSData, Log* Log, runData* run_data) {
+	float speed = medianThree(GPSData->speedMph);
+	Log->maxSpeed = (speed > Log->maxSpeed && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? speed : Log->maxSpeed;
+
+	float alt = medianThree(GPSData->altitude);
+	Log->maxAltitude = (alt > Log->maxAltitude && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? alt : Log->maxAltitude;
+
+	float runLength = calcDistance(run_data->startLat,run_data->startLong,run_data->stopLat,run_data->stopLong);
+	Log->longestRun = (runLength > Log->longestRun) ? runLength : Log->longestRun;
+
+	float runHeight = run_data->startAlt - run_data->stopAlt;
+	Log->tallestRun = (runHeight > Log->tallestRun) ? runHeight : Log->tallestRun;
+}
+
+uint16_t calcCheckSum(char buffer[100]){
 	int i = 1;
-	char letter = *(data->dataBuffer);
+	char letter = *(buffer);
 	uint16_t sum = 0;
 
 	while(letter != '*'){
 
-		letter = *(data->dataBuffer+i);
+		letter = *(buffer+i);
 
 		if(letter != '$' && letter != '*'){
 			sum = sum ^ letter;
@@ -360,20 +429,9 @@ uint16_t calcCheckSum(gpsData *data){
 }
 
 
-void determineMax(gpsData* GPSData, Log* Log, runData* run_data) {
-	// TODO this code should work?
-	Log->maxSpeed = (GPSData->speedMph > Log->maxSpeed) && (GPSData->speedMph - Log->maxSpeed < 50) ? GPSData->speedMph : Log->maxSpeed;
-	Log->maxAltitude = (GPSData->altitude > Log->maxAltitude) && (GPSData->altitude - Log->maxAltitude < 25) ? GPSData->altitude : Log->maxAltitude;
-
-	float runLength = calcDistance(run_data->startLat,run_data->startLong,run_data->stopLat,run_data->stopLong);
-	Log->longestRun = (runLength > Log->longestRun) ? runLength : Log->longestRun;
-
-	float runHeight = run_data->startAlt - run_data->stopAlt;
-	Log->tallestRun = (runHeight > Log->tallestRun) ? runHeight : Log->tallestRun;
-}
-
 void checkRunStatus(gpsData* data, runData* run_data) {
-	if(runStatus == running && data->speedMph <= THRESHOLD_SPEED){
+	float speed = medianThree(data->speedMph);
+	if(runStatus == running && speed <= THRESHOLD_SPEED){
 			if(firstTimeOver == 0) {
 				//Keep track of the time when we first stopped
 				stopStartTimeInSecs = data->timeInSecs;
@@ -382,18 +440,32 @@ void checkRunStatus(gpsData* data, runData* run_data) {
 
 			//Stopped for 15 seconds
 			if(data->timeInSecs - stopStartTimeInSecs >= 15){
-				run_data->stopAlt =data->altitude;
-				run_data->stopLat = data->latitude;
-				run_data->stopLong = data->longitude;
+				run_data->stopAlt = medianThree(data->altitude);
+				run_data->stopLat = medianThree(data->latitude);
+				run_data->stopLong = medianThree(data->longitude);
 				runStatus = notRunning;
+				endTime = data->timeInSecs;
+				recordedData.run[curRun].numberOfPoints = curData;
+				recordedData.run[curRun].horizontalDistance = calcDistance(
+					recordedData.run[curRun].data[0].latitude,
+					recordedData.run[curRun].data[0].longitude,
+					recordedData.run[curRun].data[curData-1].latitude,
+					recordedData.run[curRun].data[curData-1].longitude);
+				float avgSpeed = 0;
+				for (uint32_t i = 0; i < curData; ++i) {
+					avgSpeed += recordedData.run[curRun].data[i].GPSspeed;
+				}
+				recordedData.run[curRun].averageSpeed = avgSpeed / curData;
+				recordedData.run[curRun].verticalDistance = recordedData.run[curRun].data[0].altitude - recordedData.run[curRun].data[curData-1].altitude;
+				recordedData.run[curRun].elapsedTime = endTime - startTime;
 			}
 
-		} else if(runStatus == running && data->speedMph > THRESHOLD_SPEED){
+		} else if(runStatus == running && speed > THRESHOLD_SPEED){
 			firstTimeOver = 0;
 			//Moving right now so reset firstTimeOver because we didn't stay in place for 15 secs
 		}
 
-		if((runStatus == notRunning && data->speedMph > THRESHOLD_SPEED) || (data->speedMph >= 15)){
+		if((runStatus == notRunning && speed > THRESHOLD_SPEED) || (speed >= 15)){
 			if(firstTimeOver == 0){
 				//Keep track of the time when we first started moving
 				runStartTimeInSecs = data->timeInSecs;
@@ -401,18 +473,22 @@ void checkRunStatus(gpsData* data, runData* run_data) {
 			}
 
 			//Moving for 7 seconds
-			if(data->timeInSecs - runStartTimeInSecs >= 7 || (data->speedMph >= 15)){
-				run_data->startAlt = data->altitude;
-				run_data->startLat = data->latitude;
-				run_data->startLong = data->longitude;
+			if(data->timeInSecs - runStartTimeInSecs >= 7 || (speed >= 15)){
+				run_data->startAlt = medianThree(data->altitude);
+				run_data->startLat = medianThree(data->latitude);
+				run_data->startLong = medianThree(data->longitude);
 				runStatus = running;
+				startTime = data->timeInSecs;
+				curRun++;
+				curData = 0;
 			}
 
-		} else if(runStatus == notRunning && data->speedMph <= THRESHOLD_SPEED){
+		} else if(runStatus == notRunning && speed <= THRESHOLD_SPEED){
 			firstTimeOver = 0;
 			//Stopped right now so reset firstTimeOver
 		}
 }
+
 
  // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}
 
@@ -684,12 +760,9 @@ void IMU_Calibrate(I2C_HandleTypeDef* hi2c1) {
 	gyro = (buf[0] >> 4) & 0x03;
 	accel = (buf[0] >> 2) & 0x03;
 	mg = buf[0] & 0x03;
+	IMUTimeout = 1;
 	// TODO Times out after 100 seconds or smth
 	// Stays in calibration until IMU is calibrated
-	while ((accel + gyro + mg + system) < 12) {
-		printf("Calibrating... aCal: %d gCal: %d mCal: %d sCal: %d \n\r", accel, gyro, mg, system);
-		HAL_Delay(100);
-	}
 }
 
 void IMU_GET_EUL(I2C_HandleTypeDef* hi2c1, float* Euler[]) {
@@ -751,7 +824,6 @@ void IMU_Determine_Max_Slope(I2C_HandleTypeDef* hi2c1, float curSlope, float pre
 }
 
 float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1) {
-	HAL_Delay(100);
 	uint8_t buf[2];
 	float orgDegPos = 0;
 	// Configure the IMU settings
@@ -1147,10 +1219,11 @@ uint8_t SD_write(FATFS* FatFs, Log* log, UART_HandleTypeDef *huart2) {
 }
 
 float getBatteryPercentage(float temp, uint32_t adcVal){
-	static int batteryCalcMatrix[3][2] = {{5,2},{-5,5},{-100,10}}; //each row is a temp band, going lowest to highest
+	static int batteryCalcMatrix[3][2] = {{-100,10},{-5,5},{5,2}}; //each row is a temp band, going lowest to highest
 	float delta = 2.0f*((adcVal+350)*2.0/2260.0) - 2.8;
 //	float delta = (adcVal*2)/2260.0;
 	float percentage = -999;
+	int bSize = 10;
 	if(delta <= 0){
 		percentage = 0;
 	}
@@ -1169,15 +1242,17 @@ float getBatteryPercentage(float temp, uint32_t adcVal){
 			}
 		}
 	}
+
 	int bufferSize = 5;
 	static float percAvgBuffer[5];
 	for(int i = 1; i < bufferSize; i++){
+
 		percAvgBuffer[i-1]=percAvgBuffer[i];
 	}
-	percAvgBuffer[bufferSize] = percentage;
+	percAvgBuffer[bSize - 1] = percentage;
 	float percentFiltered;
-	for(int i = 0; i < bufferSize; i++){
-		percentFiltered += (percAvgBuffer[i])/((float)bufferSize);
+	for(int i = 0; i < bSize; i++){
+		percentFiltered += (percAvgBuffer[i])/(bSize);
 	}
 	return percentFiltered;
 }
@@ -1196,7 +1271,7 @@ void LCD_printFlt(float data) {
 
 void LCD_printFltDecLim(float data) {
   	char temp[16];
-	sprintf(temp, "%.1f", data);
+	sprintf(temp, "%.0f", data);
 	HD44780_PrintStr(temp);
 }
 
@@ -1229,7 +1304,6 @@ uint8_t readSDsendBT(FATFS* FatFs, UART_HandleTypeDef *huart2) {
 	f_close(&fil);
 //	f_mount(NULL, "", 0);
 	return 1;
-
 }
 
 // Bluetooth Functions
