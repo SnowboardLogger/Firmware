@@ -352,9 +352,9 @@ void stopGPS(UART_HandleTypeDef* huart1);
 void startGPS(UART_HandleTypeDef* huart1);
 
 // Bluetooth Stuff
-void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size);
+void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str[], uint8_t size);
 void printScreen(screenStates* s, Log* log);
-uint8_t readSDsendBT(UART_HandleTypeDef *huart2);
+uint8_t readSDsendBT(FATFS* FatFs, UART_HandleTypeDef *huart2);
 
 // IMU Stuff
 void IMU_Config(I2C_HandleTypeDef* hi2c1);
@@ -374,7 +374,7 @@ float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1); // After this, de
 float getBatteryPercentage(float temp, uint32_t adcVal);
 
 // SD Card
-uint8_t SD_write(Log* log);
+uint8_t SD_write(FATFS* FatFs, Log* log, UART_HandleTypeDef *huart2);
 
 #ifdef __cplusplus
 }

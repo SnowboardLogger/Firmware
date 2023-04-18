@@ -416,10 +416,7 @@ void checkRunStatus(gpsData* data, runData* run_data) {
 
  // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}
 
-// Bluetooth Functions
-void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size) {
-	HAL_UART_Transmit(huart2, str, size, 1000);
-}
+
 
 // LCD Functions
 void printScreen(screenStates* s, Log* log) {
@@ -929,104 +926,215 @@ void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type) {
 	HAL_I2C_Master_Transmit(hi2c1, I2C_Addr, &buf[0], 2, 1000);
 }
 
-uint8_t SD_write(Log* log) {
+uint8_t SD_write(FATFS* FatFs, Log* log, UART_HandleTypeDef *huart2) {
 
-	  FATFS       FatFs;                //Fatfs handle
+//	  FATFS       FatFs;                //Fatfs handle
 	  FIL         fil;                  //File handle
 	  FRESULT     fres;                 //Result after operations
 
 	  // Mount and open SD card
-	  fres = f_mount(&FatFs, "", 1);    //1=mount now
-	  if (fres != FR_OK) {
-		  f_close(&fil);
-		  f_mount(NULL, "", 0);
-		  return 0;
-	  }
+//	  fres = f_mount(FatFs, "", 1);    //1=mount now
+//	  if (fres != FR_OK) {
+//		  f_close(&fil);
+//		  f_mount(NULL, "", 0);
+//		  return 0;
+//	  }
 	  fres = f_open(&fil, "logs.txt", FA_WRITE | FA_OPEN_ALWAYS);
 	  if (fres != FR_OK) {
 		  f_close(&fil);
-		  f_mount(NULL, "", 0);
+//		  f_mount(NULL, "", 0);
 		  return 0;
 	  }
-	  char t[100];
+	  char t[20];
 
-	  f_puts("max speed: ", &fil);
-	  sprintf(t, "%f", log->maxSpeed);
-	  f_puts(t, &fil);
+	  HAL_Delay(20);
 
-	  f_puts(" | max alt: ", &fil);
-	  sprintf(t, "%f", log->maxAltitude);
-	  f_puts(t, &fil);
-
-	  f_puts(" | tallest: ", &fil);
-	  sprintf(t, "%f", log->tallestRun);
-	  f_puts(t, &fil);
-
-	  f_puts(" | longest: ", &fil);
-	  sprintf(t, "%f", log->longestRun);
-	  f_puts(t, &fil);
-
-	  f_puts(" | num runs: ", &fil);
-	  sprintf(t, "%i", log->numberOfRuns);
-	  f_puts(t, &fil);
-
-	  f_puts("\n", &fil);
+//	  f_puts("max speed: ", &fil);
+//	  sprintf(t, "%.2f", log->maxSpeed);
+//	  HAL_Delay(5);
+//	  f_puts(t, &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, "Max Speed (mph):", sizeof("Max Speed (mph):"));
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, t, sizeof(t));
+//	  HAL_Delay(20);
+//
+//	  f_puts(" | max alt: ", &fil);
+//	  sprintf(t, "%.2f", log->maxAltitude);
+//	  HAL_Delay(5);
+//	  f_puts(t, &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, " | Max Alt. (m):", sizeof(" | Max Alt. (m):"));
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, t, sizeof(t));
+//	  HAL_Delay(20);
+//
+//	  f_puts(" | tallest: ", &fil);
+//	  sprintf(t, "%.2f", log->tallestRun);
+//	  HAL_Delay(5);
+//	  f_puts(t, &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, " | Tallest (m):", sizeof(" | Tallest (m):"));
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, t, sizeof(t));
+//	  HAL_Delay(20);
+//
+//	  f_puts(" | longest: ", &fil);
+//	  sprintf(t, "%.2f", log->longestRun);
+//	  HAL_Delay(5);
+//	  f_puts(t, &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, " | Longest (m):", sizeof(" | Longest (m):"));
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, t, sizeof(t));
+//	  HAL_Delay(20);
+//
+//	  f_puts(" | num runs: ", &fil);
+//	  sprintf(t, "%i", log->numberOfRuns);
+//	  HAL_Delay(5);
+//	  f_puts(t, &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, " | Num Runs:", sizeof(" | Num Runs:"));
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, t, sizeof(t));
+//	  HAL_Delay(20);
+//
+//	  f_puts("\n", &fil);
+//	  HAL_Delay(20);
+//	  BT_sendData(huart2, "\n", sizeof("\n"));
+//	  HAL_Delay(20);
 
 //	  for (uint8_t i = 0; i < log->numberOfRuns; ++i) {
 	  for (uint8_t i = 0; i < 3; ++i) {
 
 	   	f_puts("run ", &fil);
 	   	sprintf(t, "%i", i);
+	   	HAL_Delay(5);
 		f_puts(t, &fil);
 	   	f_puts(" - ", &fil);
+	   	HAL_Delay(20);
+	   	BT_sendData(huart2, "Run ", sizeof("Run "));
+	   	HAL_Delay(20);
+	   	BT_sendData(huart2, t, sizeof(t));
+	   	HAL_Delay(20);
+	   	BT_sendData(huart2, " - ", sizeof(" - "));
+	   	HAL_Delay(20);
 
-	 	f_puts(" elapsed time: ", &fil);
-		sprintf(t, "%i", log->run[i].elapsedTime);
-		f_puts(t, &fil);
-
-		f_puts(" | vert dist: ", &fil);
-		sprintf(t, "%i", log->run[i].verticalDistance);
-		f_puts(t, &fil);
-
-		f_puts(" | horiz dist: ", &fil);
-		sprintf(t, "%i", log->run[i].horizontalDistance);
-		f_puts(t, &fil);
-
-		f_puts(" | avg speed: ", &fil);
-		sprintf(t, "%i", log->run[i].averageSpeed);
-		f_puts(t, &fil);
-
-		f_puts(" | num points: ", &fil);
-		sprintf(t, "%i", log->run[i].numberOfPoints);
-		f_puts(t, &fil);
+//	 	f_puts(" elapsed time: ", &fil);
+//		sprintf(t, "%i", log->run[i].elapsedTime);
+//		HAL_Delay(5);
+//		f_puts(t, &fil);
+//		HAL_Delay(20);
+//		BT_sendData(huart2, "Elapsed Time (s):", sizeof("Elapsed Time (s):"));
+//		HAL_Delay(20);
+//		BT_sendData(huart2, t, sizeof(t));
+//		HAL_Delay(20);
+//
+//		f_puts(" | vert dist: ", &fil);
+//		sprintf(t, "%i", log->run[i].verticalDistance);
+//		HAL_Delay(5);
+//		f_puts(t, &fil);
+//		HAL_Delay(20);
+//		BT_sendData(huart2, " | Vert. Dist. (m):", sizeof(" | Vert. Dist. (m):"));
+//		HAL_Delay(20);
+//		BT_sendData(huart2, t, sizeof(t));
+//		HAL_Delay(20);
+//
+//		f_puts(" | horiz dist: ", &fil);
+//		sprintf(t, "%i", log->run[i].horizontalDistance);
+//		HAL_Delay(5);
+//		f_puts(t, &fil);
+//		HAL_Delay(20);
+//		BT_sendData(huart2, " | Horiz. Dist. (m):", sizeof(" | Horiz. Dist. (m):"));
+//		HAL_Delay(20);
+//		BT_sendData(huart2, t, sizeof(t));
+//		HAL_Delay(20);
+//
+//		f_puts(" | avg speed: ", &fil);
+//		sprintf(t, "%i", log->run[i].averageSpeed);
+//		HAL_Delay(5);
+//		f_puts(t, &fil);
+//		HAL_Delay(20);
+//		BT_sendData(huart2, " | Avg. Speed (mph):", sizeof(" | Avg. Speed (mph):"));
+//		HAL_Delay(20);
+//		BT_sendData(huart2, t, sizeof(t));
+//		HAL_Delay(20);
+//
+//		f_puts(" | num points: ", &fil);
+//		sprintf(t, "%i", log->run[i].numberOfPoints);
+//		HAL_Delay(5);
+//		f_puts(t, &fil);
+//		HAL_Delay(20);
+//		BT_sendData(huart2, " | Num Data Pts:", sizeof(" | Num Data Pts: "));
+//		HAL_Delay(20);
+//		BT_sendData(huart2, t, sizeof(t));
+//		HAL_Delay(20);
 
 		f_puts("\n", &fil);
+		HAL_Delay(20);
+		BT_sendData(huart2, "\n", sizeof("\n"));
+		HAL_Delay(20);
 
 //		for (uint8_t j = 0; j < log->run[i].numberOfPoints; ++j) {
 		for (uint8_t j = 0; j < 20; ++j) {
 
-			f_puts("\tdata point ", &fil);
+			f_puts("\tdata point - ", &fil);
 			sprintf(t, "%i", j);
+			HAL_Delay(5);
 			f_puts(t, &fil);
 			f_puts(" - ", &fil);
+			HAL_Delay(20);
+			BT_sendData(huart2, "\tdata pt - ", sizeof("\tData Pt "));
+			HAL_Delay(20);
+//			BT_sendData(huart2, t, sizeof(t));
+//			HAL_Delay(20);
+//			BT_sendData(huart2, " -  ", sizeof(" - "));
+			HAL_Delay(20);
 
-			f_puts(" speed: ", &fil);
-	    		sprintf(t, "%i", log->run[i].data[j].GPSspeed);
-	    		f_puts(t, &fil);
-
-			f_puts(" | altitude: ", &fil);
-	    		sprintf(t, "%i", log->run[i].data[j].altitude);
-	    		f_puts(t, &fil);
+//			f_puts(" speed: ", &fil);
+//			sprintf(t, "%i", log->run[i].data[j].GPSspeed);
+//			HAL_Delay(5);
+//			f_puts(t, &fil);
+//			HAL_Delay(20);
+//			BT_sendData(huart2, "Speed (mph):", sizeof("Speed (mph):"));
+//			HAL_Delay(20);
+//			BT_sendData(huart2, t, sizeof(t));
+//			HAL_Delay(20);
+//
+//			f_puts(" | altitude: ", &fil);
+//			sprintf(t, "%i", log->run[i].data[j].altitude);
+//			HAL_Delay(5);
+//			f_puts(t, &fil);
+//			HAL_Delay(20);
+//			BT_sendData(huart2, " | Alt. (m):", sizeof(" | Alt. (m):"));
+//			HAL_Delay(20);
+//			BT_sendData(huart2, t, sizeof(t));
+			HAL_Delay(20);
 
 			f_puts(" | longitude: ", &fil);
-	    		sprintf(t, "%i", log->run[i].data[j].longitude);
-	    		f_puts(t, &fil);
+			sprintf(t, "%i", log->run[i].data[j].longitude);
+			HAL_Delay(5);
+			f_puts(t, &fil);
+			HAL_Delay(20);
+			BT_sendData(huart2, " | Long. (deg):", sizeof(" | Long. (deg):"));
+			HAL_Delay(20);
+			BT_sendData(huart2, t, sizeof(t));
+			HAL_Delay(20);
 
 			f_puts(" | latitude: ", &fil);
-	    		sprintf(t, "%i", log->run[i].data[j].latitude);
-	    		f_puts(t, &fil);
+			sprintf(t, "%i", log->run[i].data[j].latitude);
+			HAL_Delay(5);
+			f_puts(t, &fil);
+			HAL_Delay(20);
+			BT_sendData(huart2, " | Lat (deg):", sizeof(" | Lat. (deg):"));
+			HAL_Delay(20);
+			BT_sendData(huart2, t, sizeof(t));
+			HAL_Delay(20);
 
 			f_puts("\n", &fil);
+			HAL_Delay(20);
+			BT_sendData(huart2, "\n", sizeof("\n"));
+			HAL_Delay(20);
 
 		}
 
@@ -1034,7 +1142,7 @@ uint8_t SD_write(Log* log) {
 
 	  // Close and eject SD card
 	  f_close(&fil);
-	  f_mount(NULL, "", 0);
+//	  f_mount(NULL, "", 0);
 	  return 1;
 }
 
@@ -1062,7 +1170,7 @@ float getBatteryPercentage(float temp, uint32_t adcVal){
 		}
 	}
 	int bufferSize = 5;
-	static float percAvgBuffer[bufferSize];
+	static float percAvgBuffer[5];
 	for(int i = 1; i < bufferSize; i++){
 		percAvgBuffer[i-1]=percAvgBuffer[i];
 	}
@@ -1092,22 +1200,22 @@ void LCD_printFltDecLim(float data) {
 	HD44780_PrintStr(temp);
 }
 
-uint8_t readSDsendBT(UART_HandleTypeDef *huart2) {
-	FATFS       FatFs;                //Fatfs handle
+uint8_t readSDsendBT(FATFS* FatFs, UART_HandleTypeDef *huart2) {
+//	FATFS       FatFs;                //Fatfs handle
 	FIL         fil;                  //File handle
 	FRESULT     fres;                 //Result after operations
 
 	// Mount and open SD card
-	fres = f_mount(&FatFs, "", 1);    //1=mount now
-	if (fres != FR_OK) {
-		f_close(&fil);
-		f_mount(NULL, "", 0);
-		return 0;
-	}
+//	fres = f_mount(FatFs, "", 1);    //1=mount now
+//	if (fres != FR_OK) {
+//		f_close(&fil);
+//		f_mount(NULL, "", 0);
+//		return 0;
+//	}
 	fres = f_open(&fil, "logs.txt", FA_READ);
 	if (fres != FR_OK) {
 		f_close(&fil);
-		f_mount(NULL, "", 0);
+//		f_mount(NULL, "", 0);
 		return 0;
 	}
 
@@ -1119,7 +1227,12 @@ uint8_t readSDsendBT(UART_HandleTypeDef *huart2) {
 
 	// Close and eject SD card
 	f_close(&fil);
-	f_mount(NULL, "", 0);
+//	f_mount(NULL, "", 0);
 	return 1;
 
+}
+
+// Bluetooth Functions
+void BT_sendData(UART_HandleTypeDef *huart2, uint8_t* str[], uint8_t size) {
+	HAL_UART_Transmit(huart2, str, size, 3000);
 }

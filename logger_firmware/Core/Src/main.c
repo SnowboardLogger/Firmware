@@ -1,4 +1,3 @@
-
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -204,7 +203,15 @@ int main(void)
   HAL_ADC_Start_IT(&hadc1);
   //IMU_Config(&hi2c1);
 
-//  HD44780_PrintStr("hi");
+  // SD card
+  FATFS FatFs;
+  FRESULT res;
+
+  res = f_mount(&FatFs, "", 1);    //1=mount now
+  if (res != FR_OK) {
+	  f_mount(NULL, "", 0);
+	  return 0;
+  }
 
   /* USER CODE END 2 */
 
@@ -252,13 +259,7 @@ int main(void)
 	  			HD44780_PrintStr("                ");
 	  			// delay - while gps !fix to satellite
 	  			uint32_t ct = 0;
-	  			while (GPSData.fix != 1) {
-	  				++ct;
-	  				if (ct >= 40000000) {
-	  					break;
-	  				}
-	  			}
-	  			state = (ct >= 100000) ? stopLog : prevState;
+	  			state = (ct >= 0) ? stopLog : prevState;
 	  			break;
 	  		case stopLog:
 	  			HD44780_PrintStr("Stopping log    ");
@@ -289,7 +290,7 @@ int main(void)
 					HD44780_SetCursor(1, 0);
 					HD44780_PrintStr("                ");
 					// Save data to SD card
-					s = SD_write(&recordedData);
+					s = SD_write(&FatFs, &recordedData, &huart2);
 	  			} else {
 	  				HD44780_PrintStr("No satellite fix");
 					HD44780_SetCursor(1, 0);
@@ -297,7 +298,9 @@ int main(void)
 	  			}
 	  			// If SD card ops successful, go to prevState
 	  			state = s ? prevState : error;
-	  			if (s) readSDsendBT(&huart2);
+//	  			if (s) {
+//	  				uint8_t x = readSDsendBT(&FatFs, &huart2);
+//	  			}
 	  			break;
 	  		case battery:
 	  			// Get battery percentage and temperature
