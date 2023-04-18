@@ -272,7 +272,6 @@ int main(void)
 	  			break;
 	  		case save: ;
 	  			uint8_t s = 1;
-
 	  			if (1) {
 	  				HD44780_PrintStr("Log Saved       ");
 					HD44780_SetCursor(1, 0);
