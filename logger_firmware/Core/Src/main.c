@@ -1,4 +1,3 @@
-
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -221,9 +220,20 @@ int main(void)
   // Will listen for an interrupt on this pin
   HAL_UART_Receive_IT(&huart1, (uint8_t *) bufferByte, 1);
   HAL_ADC_Start_IT(&hadc1);
+
   IMU_Config(&hi2c1);
   IMU_Calibrate(&hi2c1);
   float CalcDg = IMU_GET_ORIENTATION_FOR_SLOPE(&hi2c1);
+
+  // SD card
+  FATFS FatFs;
+  FRESULT res;
+
+  res = f_mount(&FatFs, "", 1);    //1=mount now
+  if (res != FR_OK) {
+	  f_mount(NULL, "", 0);
+	  return 0;
+  }
 
   /* USER CODE END 2 */
 
