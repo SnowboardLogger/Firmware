@@ -58,6 +58,8 @@ extern volatile int gpsParseFlag;
 
 uint32_t counter = 0;
 uint32_t timer6 = 0;
+uint8_t buttonActive = 0;
+uint8_t activeButtonCounter = 0;
 volatile uint32_t buttonCounter = 0;
 extern volatile uint32_t adcOutput;
 
@@ -230,7 +232,10 @@ void EXTI4_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI4_IRQn 0 */
   // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-  btnFourIRQ(&state, &prevState);
+  if (buttonActive == 0) {
+	  buttonActive = 1;
+	  btnFourIRQ(&state, &prevState);
+  }
   /* USER CODE END EXTI4_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIOB4_Pin);
   /* USER CODE BEGIN EXTI4_IRQn 1 */
@@ -261,7 +266,10 @@ void EXTI9_5_IRQHandler(void)
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
   // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-  btnNineToFiveIRQ(&state, &prevState, &isLogging);
+  if (buttonActive == 0) {
+	  buttonActive = 1;
+	  btnNineToFiveIRQ(&state, &prevState, &isLogging);
+  }
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIOB5_Pin);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
@@ -275,6 +283,9 @@ void EXTI9_5_IRQHandler(void)
 void TIM1_UP_TIM16_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_UP_TIM16_IRQn 0 */
+  // DO we want to check if signals are primed before calling a interrupt?
+  // TODO Maybe, but I don't think it's necessary
+
   // If Buzzer is enabled, oscillates at 2 kHz
   if (buzEnable == 1) {
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_12);
@@ -292,6 +303,13 @@ void TIM1_UP_TIM16_IRQHandler(void)
 	  IMU_DATA_FLAG = 0;
   }
 
+  if (buttonActive == 1) {
+	  activeButtonCounter++;
+	  if (activeButtonCounter % 60) {
+		  activeButtonCounter = 0;
+		  buttonActive = 0;
+	  }
+  }
   counter = (counter > 60000) ? 0 : counter+1;
 
   /* USER CODE END TIM1_UP_TIM16_IRQn 0 */
@@ -335,9 +353,11 @@ void USART1_IRQHandler(void)
 void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
-
-  // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
-  btnFifteenToTenIEQ(&state, &prevState, &isLogging);
+  if (buttonActive == 0) {
+	  buttonActive = 1;
+	  // NOTE: ALL INTERRUPTS SUBJECT TO CHANGE/REORDERING
+	  btnFifteenToTenIEQ(&state, &prevState, &isLogging);
+  }
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(Button_GPIO_Pin);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */

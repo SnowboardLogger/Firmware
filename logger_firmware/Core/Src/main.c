@@ -1,3 +1,4 @@
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -79,6 +80,16 @@ volatile float temperature = 10;
 volatile char gpsDataBuffer[100]="ASDFADFHDFGASDFASDFSDFHDASDF";//dataBuffer
 volatile int gpsParseFlag = 0;
 
+// TODO: New stuff Corbin Added, needs to be checked
+volatile runStates runStatus;
+runData run_data = {
+		0, 0, 0, // start lat, long, alt
+		0, 0, 0  //stop lat, long, alt
+};
+volatile float runStartTimeInSecs;
+volatile float stopStartTimeInSecs;
+volatile int firstTimeOver;
+
 volatile gpsData GPSData = {
 		  0,
 		  "hh",
@@ -109,6 +120,7 @@ volatile gpsData GPSData = {
 		  "0",//checksumrmc
 		  0//dataGoodrmc
 };
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -183,9 +195,9 @@ int main(void)
   	char inputBuffer[] = "$PMTK314,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n";
   	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
-  	//Change GPS update frequency to every 3000 milliseconds
-  	char inputBuffer2[] = "$PMTK220,3000*1D\r\n";
-  	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
+  //Change GPS update frequency to every 3000 milliseconds
+  char inputBuffer2[] = "$PMTK220,3000*1D\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
   bytesReceived = 0;
 
   uint8_t curLog, curRun, curDataPoint;
@@ -196,6 +208,7 @@ int main(void)
   //IMU_Config(&hi2c1);
 
 //  HD44780_PrintStr("hi");
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -216,57 +229,53 @@ int main(void)
 
 
 	  HD44780_SetCursor(0, 0);
-	  	char temp[16];
 	  	switch(state) {
 	  		case speed:
 	  			HD44780_PrintStr("Max Speed (mph):");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", recordedData.maxSpeed);
-//	  			HD44780_PrintStr("                ");
-	  			HD44780_PrintStr(temp);
-	  			HD44780_PrintStr("        ");
+	  			LCD_printFlt(recordedData.maxSpeed);
 	  			break;
 	  		case alt:
 	  			HD44780_PrintStr("Max Alt. (m):   ");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", recordedData.maxAltitude);
-//	  			HD44780_PrintStr("                ");
-	  			HD44780_PrintStr(temp);
-	  			HD44780_PrintStr("        ");
+	  			LCD_printFlt(recordedData.maxAltitude);
 	  			break;
 	  		case longest:
 	  			//HD44780_PrintStr("Longest Run (m):");
 	  			HD44780_PrintStr("Current Speed:   ");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", GPSData.speedMph[2]);
-//	  			HD44780_PrintStr("                ");
-	  			HD44780_PrintStr(temp);
-	  			HD44780_PrintStr("        ");
+	  	//	sprintf(temp, "%f", GPSData.speedMph[2]);
+      //	HD44780_PrintStr("                ");
+	    //	HD44780_PrintStr(temp);
+	  	//	HD44780_PrintStr("        ");
+	  			LCD_printFlt(recordedData.longestRun);
 	  			break;
 	  		case tallest:
 	  			//HD44780_PrintStr("Tallest Run (m):");
 	  			HD44780_PrintStr("Current Alt:    ");
 	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%f", GPSData.altitude[2]);
-//	  			HD44780_PrintStr("                ");
-	  			HD44780_PrintStr(temp);
-	  			HD44780_PrintStr("        ");
+   //  		sprintf(temp, "%f", GPSData.altitude[2]);
+//	  		HD44780_PrintStr("                ");
+//	  		HD44780_PrintStr(temp);
+//	  		HD44780_PrintStr("        ");
+	  			LCD_printFlt(recordedData.tallestRun);
 	  			break;
 	  		case steepest:
 	  			//HD44780_PrintStr("Steepest (deg): ");
 	  			HD44780_PrintStr("numSatellites :    ");
 				HD44780_SetCursor(1, 0);
-				//sprintf(temp, "%f", recordedData.steepestRun);
-				sprintf(temp, "%u", GPSData.numSatellites);
-//				HD44780_PrintStr("                ");
+		//  sprintf(temp, "%f", recordedData.steepestRun);
+		//	sprintf(temp, "%u", GPSData.numSatellites);
+    //	HD44780_PrintStr("                ");
 				HD44780_PrintStr(temp);
 				HD44780_PrintStr("        ");
+				LCD_printFlt(recordedData.steepestRun);
 				break;
 	  		case startLog:
 	  			HD44780_PrintStr("Starting log    ");
 	  			HD44780_SetCursor(1, 0);
 	  			HD44780_PrintStr("                ");
-	  			// delay - while gps !connected
+	  			// delay - while gps !fix to satellite
 	  			uint32_t ct = 0;
 	  			while (GPSData.fix != 1) {
 	  				++ct;
@@ -280,7 +289,7 @@ int main(void)
 	  			HD44780_PrintStr("Stopping log    ");
 	  			HD44780_SetCursor(1, 0);
 	  			HD44780_PrintStr("                ");
-	  			// delay - 2 secs-ish
+	  			// Delay for user
 	  			HAL_Delay(2000);
 	  			state = save;
 	  			break;
@@ -297,39 +306,51 @@ int main(void)
 	  			// restart logging
 	  			state = prevState;
 	  			break;
-	  		case save:
-	  			HD44780_PrintStr("Log Saved       ");
-	  			HD44780_SetCursor(1, 0);
-	  			HD44780_PrintStr("                ");
-	  			// save data to sd
-	  			sdTest(&recordedData);
-	  			state = prevState;
+	  		case save: ;
+	  			uint8_t s = 1;
+
+	  			if (1) {
+	  				HD44780_PrintStr("Log Saved       ");
+					HD44780_SetCursor(1, 0);
+					HD44780_PrintStr("                ");
+					// Save data to SD card
+					s = SD_write(&recordedData);
+	  			} else {
+	  				HD44780_PrintStr("No satellite fix");
+					HD44780_SetCursor(1, 0);
+					HD44780_PrintStr("                ");
+	  			}
+	  			// If SD card ops successful, go to prevState
+	  			state = s ? prevState : error;
+	  			if (s) readSDsendBT(&huart2);
 	  			break;
 	  		case battery:
+	  			// Get battery percentage and temperature
 	  			HAL_ADC_Start_IT(&hadc1);
 	  			HAL_Delay(50);
 	  			temperature = IMU_GET_TEMP(&hi2c1);
 	  			batteryPercentage = getBatteryPercentage(temperature, adcOutput);
+	  			// Print battery percentage
 	  			HD44780_PrintStr("Battery %: ");
-//	  			HD44780_SetCursor(1, 0);
-	  			sprintf(temp, "%.1f", batteryPercentage);
-//	  			HD44780_PrintStr("                ");
-	  			HD44780_PrintStr(temp);
+	  			LCD_printFltDecLim(batteryPercentage);
 	  			HD44780_SetCursor(0, 15);
 	  			HD44780_PrintStr("%");
+	  			// Print temperature
 	  			HD44780_SetCursor(1, 0);
 	  			HD44780_PrintStr("Temp. (C): ");
-	  			sprintf(temp, "%.1f", temperature);
-	  			HD44780_PrintStr(temp);
-	  			HD44780_SetCursor(0, 15);
+	  			LCD_printFltDecLim(temperature);
+	  			HD44780_SetCursor(1, 15);
 				HD44780_PrintStr("C");
 	  			break;
 	  		default:
 	  			HD44780_PrintStr("Error           ");
 	  			HD44780_SetCursor(1, 0);
-	  			HD44780_PrintStr("                ");
+	  			HD44780_PrintStr("IMU or SD Card  ");
+	  			HAL_Delay(5000);
+	  			state = prevState;
 	  			break;
 	  	}
+
   }
   /* USER CODE END 3 */
 }
