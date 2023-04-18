@@ -14,8 +14,6 @@ extern "C" {
 #include "stm32l4xx_hal.h"
 #include "fatfs.h"
 
-extern volatile uint8_t buzEnable;
-
 typedef struct {
 	int hours;
 	char hoursChar[8];
@@ -64,6 +62,18 @@ typedef struct {
 	int rmcGood;
 } gpsData;
 
+typedef struct {
+
+	float startLat;
+	float startLong;
+	float startAlt;
+
+	float stopLat;
+	float stopLong;
+	float stopAlt;
+
+} runData;
+
 typedef enum {
 	speed,
 	alt,
@@ -78,6 +88,11 @@ typedef enum {
 	battery,
 	error
 } screenStates;
+
+typedef enum {
+	running,
+	notRunning
+} runStates;
 
 typedef struct {
 	float GPSspeed;
@@ -120,12 +135,19 @@ typedef struct {
 	uint16_t mag_radius;
 } IMU_OFFSET;
 
+extern volatile uint8_t buzEnable;
+extern volatile runStates runStatus;
+extern volatile int firstTimeOver;
+extern volatile float runStartTimeInSecs;
+extern volatile float stopStartTimeInSecs;
+
 // Declaration of both states
 extern screenStates state;
 extern screenStates prevState;
 extern IMU_OFFSET offset_cal_data;
 
 #define BUFFER_SIZE 100
+#define THRESHOLD_SPEED 3.0
 
 #define SD_SPI_SCK_Pin GPIO_PIN_1
 #define SD_SPI_SCK_GPIO_Port GPIOA
@@ -308,18 +330,22 @@ extern IMU_OFFSET offset_cal_data;
 #define PAGE_ID 0x7
 
 // State Control
-switchToErrorState(screenStates* s);
+void switchToErrorState(screenStates* s);
 
 // Button Interrupt
 void btnFourIRQ(screenStates* state, screenStates* prevState);
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging);
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging);
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging);
 
 // GPS Stuff
 void parseGps(gpsData *data);
-void determineMax(gpsData* GPSData, Log* Log);
+void determineMax(gpsData* GPSData, Log* Log, runData* run_data);
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef huart1);
 float calcDistance(float lat1, float long1, float lat2, float long2);
+uint16_t calcCheckSum(gpsData *data);
+void checkRunStatus(gpsData* data, runData* run_data);
+void stopGPS(UART_HandleTypeDef* huart1);
+void startGPS(UART_HandleTypeDef* huart1);
 
 // Bluetooth Stuff
 void btSendData(UART_HandleTypeDef *huart2, uint8_t* str, uint32_t size);
@@ -337,6 +363,9 @@ void IMU_POWER_ON(I2C_HandleTypeDef* hi2c1);
 void IMU_POWER_OFF(I2C_HandleTypeDef* hi2c1);
 void IMU_SAVE_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
 void IMU_SET_OFFSET(I2C_HandleTypeDef* hi2c1, IMU_OFFSET* offset_type);
+float IMU_GET_ROLL(I2C_HandleTypeDef* hi2c1);
+void IMU_Determine_Max_Slope(I2C_HandleTypeDef* hi2c1, float curSlope, float prevSlope, Log* log);
+float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1); // After this, device cannot move
 float getBatteryPercentage(float temp, uint32_t adcVal);
 
 // SD Card
