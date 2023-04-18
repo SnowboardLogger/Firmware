@@ -1,3 +1,4 @@
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -76,7 +77,17 @@ volatile uint32_t adcOutput;
 volatile float batteryPercentage;
 volatile float temperature = 10;
 
-volatile gpsData GPSData = {
+// TODO: New stuff Corbin Added, needs to be checked
+volatile runStates runStatus;
+runData run_data = {
+		0, 0, 0, // start lat, long, alt
+		0, 0, 0  //stop lat, long, alt
+};
+volatile float runStartTimeInSecs;
+volatile float stopStartTimeInSecs;
+volatile int firstTimeOver;
+
+gpsData GPSData = {
 		  0,
 		  "hh",
 		  0,
@@ -177,13 +188,13 @@ int main(void)
   HD44780_NoCursor(); // Don't show cursor
 
   //enable GGA (contains the precision data) and RMC (contains all the minimum navigation info)
-  	//data on the GPS
-  	char inputBuffer[] = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n";
-  	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
+  //data on the GPS
+  char inputBuffer[] = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer, sizeof(inputBuffer), 100);
 
-  	//Change GPS update frequency to every 3000 milliseconds
-  	char inputBuffer2[] = "$PMTK220,3000*1D\r\n";
-  	HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
+  //Change GPS update frequency to every 3000 milliseconds
+  char inputBuffer2[] = "$PMTK220,3000*1D\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t *) inputBuffer2, sizeof(inputBuffer2), 100);
   bytesReceived = 0;
 
   uint8_t curLog, curRun, curDataPoint;
@@ -206,7 +217,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  parseGps(&GPSData);
 	  //Add Check Run Status here
-	  determineMax(&GPSData, &recordedData);
+	  determineMax(&GPSData, &recordedData, &run_data);
 
 	  HD44780_SetCursor(0, 0);
 	  	switch(state) {
