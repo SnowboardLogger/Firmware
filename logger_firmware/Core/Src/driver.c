@@ -224,12 +224,15 @@ void parseGps(gpsData *data, char inputBuffer[]){
 				++dataElementIndex;
 				if(*(inputBuffer+i+1) == ','){
 					data->latitude[0] = data->latitude[1];
-					data->latitude[1] = strtof(data->latitudeChar, NULL);
+					float tempLat = (strtof(data->latitudeChar, NULL))/100.0;
+					float degL = (float)((int)tempLat);
+					degL += (tempLat - (float)degL)*10/6;
+					data->latitude[1] = tempLat;
 				}
 
 			} else if (dataElementNum == 3){
 				data->latDir = letter;
-				if(data->latDir == 'W'){
+				if(data->latDir == 'S'){
 					data->latitude[1] *= -1;
 				}
 
@@ -238,18 +241,22 @@ void parseGps(gpsData *data, char inputBuffer[]){
 				++dataElementIndex;
 				if(*(inputBuffer+i+1) == ','){
 					data->longitude[0] = data->longitude[1];
-					data->longitude[1] = strtof(data->longitudeChar, NULL);
+					float tempLong = (strtof(data->longitudeChar, NULL))/100.0;
+					float degO = (float)((int)tempLong);
+					degO += (tempLong - (float)degO)*10/6;
+					data->longitude[1] = tempLong;
 				}
 
 			} else if (dataElementNum == 5){
 				data->longDir = letter;
-				if(data->longDir == 'S'){
-					data->longitude[1] *= -1;
 
-					data->speedMph[0] = data->speedMph[1];
-					data->speedMph[1] = data->speedMph[2];
-					data->speedMph[2] = (calcDistance(data->latitude[0], data->longitude[0],data->latitude[1], data->longitude[1])/3)*2.237;//m/s->mph
+				if(data->longDir == 'W'){
+					data->longitude[1] *= -1;
 				}
+
+				(data->speedMph[0]) = (data->speedMph[1]);
+				(data->speedMph[1]) = (data->speedMph[2]);
+				(data->speedMph[2]) = (calcDistance(data->latitude[0], data->longitude[0],data->latitude[1], data->longitude[1])/3.0)*2.237;//m/s->mph
 
 			} else if (dataElementNum == 6){
 				data->fix = (uint8_t) (letter - '0');
@@ -468,13 +475,35 @@ void bubbleSort(float arr[], int n){
 }
 
 float medianThree(float nums[3]){
-	bubbleSort(nums, 3);
-	return nums[1];
+	//bubbleSort(nums, 3);
+	//return nums[1];
+	float median;
+	int maxIndex;
+	int medianIndex=2;
+	int minIndex;
+	float max = -100;
+	float min = 100;
+	for(int i = 0; i < 2; i++){
+		if(nums[i]>max){
+			max=nums[i];
+			maxIndex = i;
+		}
+		if(nums[i]<min){
+			min=nums[i];
+			minIndex = i;
+		}
+	}
+	for(int i = 0; i < 2; i++){
+		if(i != maxIndex && i != minIndex){
+			medianIndex = i;
+		}
+	}
+	return nums[medianIndex];
 }
 
 void determineMax(gpsData* GPSData, Log* Log) {
 	float speed = medianThree(GPSData->speedMph);
-	Log->maxSpeed = (speed > Log->maxSpeed && GPSData->rmcGood == 1 && GPSData->numSatellites >= 4) ? speed : Log->maxSpeed;
+	Log->maxSpeed = (speed > Log->maxSpeed && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? speed : Log->maxSpeed;
 
 	float alt = medianThree(GPSData->altitude);
 	Log->maxAltitude = (alt > Log->maxAltitude && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? alt : Log->maxAltitude;
