@@ -46,9 +46,10 @@
 extern volatile uint16_t Timer1, Timer2;
 extern screenStates state; // Can't declare volatile for some reason, might need to wry about this
 extern screenStates prevState; // Same issue as state
-extern volatile uint8_t isLogging;
+extern volatile uint8_t isFixed;
 extern volatile uint8_t buzEnable; // Buzzer Enable
 extern volatile uint8_t IMU_DATA_FLAG;
+extern volatile uint8_t isLogging;
 
 extern volatile gpsData GPSData;
 extern volatile char gpsDataBuffer[100];//max chars of 70 from gpgga
@@ -81,6 +82,11 @@ extern TIM_HandleTypeDef htim6;
 extern TIM_HandleTypeDef htim16;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
+extern volatile uint8_t IMU_Flag;
+extern volatile uint8_t StopLog;
+extern volatile uint8_t GPSNoFix;
+extern volatile uint8_t GPSTimeout;
+extern volatile uint8_t IMUTimeout;
 
 /* USER CODE END EV */
 
@@ -324,17 +330,17 @@ void TIM1_UP_TIM16_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-	bufferByte[0] = 0;
+  bufferByte[0] = 0;
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-  	//if (GPSData.bufferIndex < BUFFER_SIZE){
-		//GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
-  	  gpsDataBuffer[gpsBufferIndex] = *bufferByte;
-  	++gpsBufferIndex;
-	/*} else {
-		GPSData.bufferIndex = 0;
-	}*/
+  //if (GPSData.bufferIndex < BUFFER_SIZE){
+	//GPSData.dataBuffer[GPSData.bufferIndex++] = *bufferByte;
+  gpsDataBuffer[gpsBufferIndex] = *bufferByte;
+  ++gpsBufferIndex;
+  /*} else {
+	GPSData.bufferIndex = 0;
+  }*/
 
 	if(*bufferByte == '\n'){
 		//GPSData.bufferIndex = 0;
@@ -371,20 +377,44 @@ void EXTI15_10_IRQHandler(void)
 void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
-	/*
-  if (GPSTimeout == 1 && timer6 % 15 == 0) {
-	  switchToErrorState();
-	  GPSTimeout = 0;
-	  if (IMUTimeout == 0) { timer6 = 0; }
+  if (GPSTimeout == 1) {
+	  if (GPSData.fix != 0) {
+		  state = prevState;
+		  GPSTimeout = 0;
+		  isFixed = 1;
+	  } else if (timer6 >= 5) { // change back to 30
+		  state = stopLog;
+		  GPSNoFix = 1;
+		  GPSTimeout = 0;
+		  timer6 = 0;
+	  }
+	  timer6++;
   }
-  if (IMUTimeout == 1 && timer6 % 60 == 0) {
-	  switchToErrorState();
-	  IMUTimeout = 0;
-	  if (GPSTimeout == 0) { timer6 = 0; }
+
+  if (StopLog == 1) {
+	  if (timer6 >= 5) {
+		  state = save;
+		  timer6 = 0;
+		  StopLog = 0;
+	  } else {
+		  timer6++;
+	  }
   }
-  printf("HELLO");
-  timer6 = (t6_EN) ? timer6+1 : t6_EN;
+
+  /*
+  if (IMUTimeout == 1) {
+	  if (timer6 >= 300) {
+		  timer6 = 0;
+		  state = error;
+		  IMUTimeout = 0;
+	  } else {
+		  timer6++;
+	  }
+  }
   */
+
+  timer6 = (timer6 < 40000) ? timer6 : 0;
+
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */

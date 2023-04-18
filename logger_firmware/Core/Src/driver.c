@@ -46,70 +46,77 @@ void btnFourIRQ(screenStates* state, screenStates* prevState) {
 	}
 }
 
-void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnNineToFiveIRQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case alt:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case longest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case tallest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case steepest:
 			*prevState = *state;
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		case startLog:
-			isLogging = 1;
+			*isLogging = 1;
+//			*state = *prevState;
 			break;
 		case stopLog:
-			isLogging = 0;
+			*isLogging = 0;
 			break;
 		case pauseLog:
-			isLogging = 0;
+			*isLogging = 0;
 			*state = stopLog;
 			break;
 		case resumeLog:
-			isLogging = 0;
+			*isLogging = 0;
 			*state = stopLog;
 			break;
 		case save:
 			break;
 		case battery:
-			*state = isLogging ? stopLog : startLog;
+			GPSTimeout = (GPSTimeout == 1) ? 0 : 1;
+			*state = *isLogging ? stopLog : startLog;
 			break;
 		default:
 			break;
 	}
 }
 
-void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t isLogging) {
+void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t* isLogging) {
 	buzEnable = 1;
 	switch(*state) {
 		case speed:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case alt:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case longest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case tallest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case steepest:
-			*state = isLogging ? pauseLog : battery;
+			*state = *isLogging ? pauseLog : battery;
 			break;
 		case startLog:
 			*state = pauseLog;
@@ -132,24 +139,6 @@ void btnFifteenToTenIEQ(screenStates* state, screenStates* prevState, uint8_t is
 	}
 }
 
-uint16_t calcCheckSum(char buffer[100]){
-	int i = 1;
-	char letter = *(buffer);
-	uint16_t sum = 0;
-
-	while(letter != '*'){
-
-		letter = *(buffer+i);
-
-		if(letter != '$' && letter != '*'){
-			sum = sum ^ letter;
-		}
-
-		++i;
-	}
-	return sum;
-}
-
 void swap(float* xp, float* yp){
 	//Adapted from GeeksForGeeks
     float temp = *xp;
@@ -159,7 +148,7 @@ void swap(float* xp, float* yp){
 
 
 
-void parseGps(gpsData *data, char inputBuffer[]){
+void parseGps(gpsData *data, char inputBuffer[]) {
 	int dataElementIndex = 0;
 	int dataElementNum = 0;
 	int timeCount = 0;
@@ -346,97 +335,6 @@ void parseGps(gpsData *data, char inputBuffer[]){
 					data->ggaGood = 0;
 				}
 			}
-
-		} /*else if(strcmp(dataType,"$GPRMC") == 0 && letter != ','){
-			if (dataElementNum == 2){
-				data->validity = letter;
-
-			} else if (dataElementNum == 7){
-				data->speedCharKnots[dataElementIndex] = letter;
-				++dataElementIndex;
-				if(*(inputBuffer+i+1) == ','){
-					float speed = 1.15077945 * strtof(data->speedCharKnots, NULL);
-
-
-					//Either we are on a military jet or this is wrong because the land speed record is 1200mph and jetliners fly at like 600-800mph
-					if(speed <= 100){
-						if(speed != data->speedMph[2] && speed != data->speedMph[1] && speed != data->speedMph[0]){
-							//Init 0 and 1 to the first speed so median works good
-							if(data->speedMph[2] == 0){
-								data->speedMph[0] = speed;
-								data->speedMph[1] = speed;
-								data->speedMph[2] = speed;
-							}
-
-							swap(&data->speedMph[1], &data->speedMph[0]);
-							swap(&data->speedMph[2], &data->speedMph[1]);
-							//What was in [0] gets replaced by the new value in [2]
-							data->speedMph[2] = speed;
-						}
-
-					}else {
-						if(speed != data->speedMph[2] && speed != data->speedMph[1] && speed != data->speedMph[0]){
-							if(data->speedMph[2] == 0){
-								data->speedMph[0] = -1;
-								data->speedMph[1] = -1;
-								data->speedMph[2] = -1;
-							}
-
-							swap(&data->speedMph[1], &data->speedMph[0]);
-							swap(&data->speedMph[2], &data->speedMph[1]);
-							//What was in [0] gets replaced by the new value in [2]
-							data->speedMph[2] = -1;
-						}
-					}
-
-
-				}
-
-			} /*else if (dataElementNum == 12){
-
-				//ignore the *
-				if(letter != '*' && letter != '\r' && letter != '\n'){
-					data->checksumrmc[dataElementIndex] = letter;
-					++dataElementIndex;
-				}else if (letter == '*'){
-					dataElementIndex = 0;
-				}
-
-				if(dataElementIndex == 2){
-					uint16_t check = calcCheckSum(inputBuffer);
-					char checkHex[3];
-					sprintf(checkHex, "%02X", check);
-
-					if(strcmp(data->checksumrmc, checkHex)==0){
-						//data is good
-						data->rmcGood = 1;
-					}else {
-						data->rmcGood = 0;
-					}
-
-				}
-
-			}
-			if(letter == '*'){
-				data->checksumrmc[0] = *(inputBuffer+i+1);
-				data->checksumrmc[1] = *(inputBuffer+i+2);
-
-				uint16_t check = calcCheckSum(inputBuffer);
-				char checkHex[3];
-				sprintf(checkHex, "%02X", check);
-
-				if(strcmp(data->checksumrmc, checkHex)==0){
-					//data is good
-					data->rmcGood = 1;
-				}else {
-					data->rmcGood = 0;
-				}
-			}
-		}*/
-
-
-		if(letter == '\n' || letter == '\r'){
-			break;
 		}
 	}
 }
@@ -467,26 +365,52 @@ void bubbleSort(float arr[], int n){
 }
 
 float medianThree(float nums[3]){
-	bubbleSort(nums, 3);
-	return nums[1];
+	float median;
+	int maxIndex;
+	int medianIndex=2;
+	int minIndex;
+	float max = -100;
+	float min = 100;
+	for(int i = 0; i < 2; i++){
+		if(nums[i]>max){
+			max=nums[i];
+			maxIndex = i;
+		}
+		if(nums[i]<min){
+			min=nums[i];
+			minIndex = i;
+		}
+	}
+	for(int i = 0; i < 2; i++){
+		if(i != maxIndex && i != minIndex){
+			medianIndex = i;
+		}
+	}
+	return nums[medianIndex];
 }
 
-void determineMax(gpsData* GPSData, Log* Log) {
+void determineMax(gpsData* GPSData, Log* Log, runData* run_data) {
 	float speed = medianThree(GPSData->speedMph);
 	Log->maxSpeed = (speed > Log->maxSpeed && GPSData->rmcGood == 1 && GPSData->numSatellites >= 4) ? speed : Log->maxSpeed;
 
 	float alt = medianThree(GPSData->altitude);
 	Log->maxAltitude = (alt > Log->maxAltitude && GPSData->ggaGood == 1 && GPSData->numSatellites >= 4) ? alt : Log->maxAltitude;
+
+	float runLength = calcDistance(run_data->startLat,run_data->startLong,run_data->stopLat,run_data->stopLong);
+	Log->longestRun = (runLength > Log->longestRun) ? runLength : Log->longestRun;
+
+	float runHeight = run_data->startAlt - run_data->stopAlt;
+	Log->tallestRun = (runHeight > Log->tallestRun) ? runHeight : Log->tallestRun;
 }
 
-uint16_t calcCheckSum(gpsData *data){
+uint16_t calcCheckSum(char buffer[100]){
 	int i = 1;
-	char letter = *(data->dataBuffer);
+	char letter = *(buffer);
 	uint16_t sum = 0;
 
 	while(letter != '*'){
 
-		letter = *(data->dataBuffer+i);
+		letter = *(buffer+i);
 
 		if(letter != '$' && letter != '*'){
 			sum = sum ^ letter;
@@ -497,8 +421,10 @@ uint16_t calcCheckSum(gpsData *data){
 	return sum;
 }
 
+
 void checkRunStatus(gpsData* data, runData* run_data) {
-	if(runStatus == running && data->speedMph <= THRESHOLD_SPEED){
+	float speed = medianThree(data->speedMph);
+	if(runStatus == running && speed <= THRESHOLD_SPEED){
 			if(firstTimeOver == 0) {
 				//Keep track of the time when we first stopped
 				stopStartTimeInSecs = data->timeInSecs;
@@ -507,18 +433,32 @@ void checkRunStatus(gpsData* data, runData* run_data) {
 
 			//Stopped for 15 seconds
 			if(data->timeInSecs - stopStartTimeInSecs >= 15){
-				run_data->stopAlt =data->altitude;
-				run_data->stopLat = data->latitude;
-				run_data->stopLong = data->longitude;
+				run_data->stopAlt = medianThree(data->altitude);
+				run_data->stopLat = medianThree(data->latitude);
+				run_data->stopLong = medianThree(data->longitude);
 				runStatus = notRunning;
+				endTime = data->timeInSecs;
+				recordedData.run[curRun].numberOfPoints = curData;
+				recordedData.run[curRun].horizontalDistance = calcDistance(
+					recordedData.run[curRun].data[0].latitude,
+					recordedData.run[curRun].data[0].longitude,
+					recordedData.run[curRun].data[curData-1].latitude,
+					recordedData.run[curRun].data[curData-1].longitude);
+				float avgSpeed = 0;
+				for (uint32_t i = 0; i < curData; ++i) {
+					avgSpeed += recordedData.run[curRun].data[i].GPSspeed;
+				}
+				recordedData.run[curRun].averageSpeed = avgSpeed / curData;
+				recordedData.run[curRun].verticalDistance = recordedData.run[curRun].data[0].altitude - recordedData.run[curRun].data[curData-1].altitude;
+				recordedData.run[curRun].elapsedTime = endTime - startTime;
 			}
 
-		} else if(runStatus == running && data->speedMph > THRESHOLD_SPEED){
+		} else if(runStatus == running && speed > THRESHOLD_SPEED){
 			firstTimeOver = 0;
 			//Moving right now so reset firstTimeOver because we didn't stay in place for 15 secs
 		}
 
-		if((runStatus == notRunning && data->speedMph > THRESHOLD_SPEED) || (data->speedMph >= 15)){
+		if((runStatus == notRunning && speed > THRESHOLD_SPEED) || (speed >= 15)){
 			if(firstTimeOver == 0){
 				//Keep track of the time when we first started moving
 				runStartTimeInSecs = data->timeInSecs;
@@ -526,18 +466,22 @@ void checkRunStatus(gpsData* data, runData* run_data) {
 			}
 
 			//Moving for 7 seconds
-			if(data->timeInSecs - runStartTimeInSecs >= 7 || (data->speedMph >= 15)){
-				run_data->startAlt = data->altitude;
-				run_data->startLat = data->latitude;
-				run_data->startLong = data->longitude;
+			if(data->timeInSecs - runStartTimeInSecs >= 7 || (speed >= 15)){
+				run_data->startAlt = medianThree(data->altitude);
+				run_data->startLat = medianThree(data->latitude);
+				run_data->startLong = medianThree(data->longitude);
 				runStatus = running;
+				startTime = data->timeInSecs;
+				curRun++;
+				curData = 0;
 			}
 
-		} else if(runStatus == notRunning && data->speedMph <= THRESHOLD_SPEED){
+		} else if(runStatus == notRunning && speed <= THRESHOLD_SPEED){
 			firstTimeOver = 0;
 			//Stopped right now so reset firstTimeOver
 		}
 }
+
 
  // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart1, gpsData* GPSData, char bufferByte[1]) { HAL_UART_Receive_IT(huart1, (uint8_t *) bufferByte, 1);}
 
@@ -812,12 +756,9 @@ void IMU_Calibrate(I2C_HandleTypeDef* hi2c1) {
 	gyro = (buf[0] >> 4) & 0x03;
 	accel = (buf[0] >> 2) & 0x03;
 	mg = buf[0] & 0x03;
+	IMUTimeout = 1;
 	// TODO Times out after 100 seconds or smth
 	// Stays in calibration until IMU is calibrated
-	while ((accel + gyro + mg + system) < 12) {
-		printf("Calibrating... aCal: %d gCal: %d mCal: %d sCal: %d \n\r", accel, gyro, mg, system);
-		HAL_Delay(100);
-	}
 }
 
 void IMU_GET_EUL(I2C_HandleTypeDef* hi2c1, float* Euler[]) {
@@ -879,7 +820,6 @@ void IMU_Determine_Max_Slope(I2C_HandleTypeDef* hi2c1, float curSlope, float pre
 }
 
 float IMU_GET_ORIENTATION_FOR_SLOPE(I2C_HandleTypeDef* hi2c1) {
-	HAL_Delay(100);
 	uint8_t buf[2];
 	float orgDegPos = 0;
 	// Configure the IMU settings
@@ -1164,10 +1104,11 @@ uint8_t SD_write(Log* log) {
 }
 
 float getBatteryPercentage(float temp, uint32_t adcVal){
-	static int batteryCalcMatrix[3][2] = {{5,2},{-5,5},{-100,10}}; //each row is a temp band, going lowest to highest
+	static int batteryCalcMatrix[3][2] = {{-100,10},{-5,5},{5,2}}; //each row is a temp band, going lowest to highest
 	float delta = 2.0f*((adcVal+350)*2.0/2260.0) - 2.8;
 //	float delta = (adcVal*2)/2260.0;
 	float percentage = -999;
+	int bSize = 10;
 	if(delta <= 0){
 		percentage = 0;
 	}
@@ -1186,15 +1127,14 @@ float getBatteryPercentage(float temp, uint32_t adcVal){
 			}
 		}
 	}
-	int bufferSize = 5;
-	static float percAvgBuffer[bufferSize];
-	for(int i = 1; i < bufferSize; i++){
+	static float percAvgBuffer[10];
+	for(int i = 1; i < bSize; i++){
 		percAvgBuffer[i-1]=percAvgBuffer[i];
 	}
-	percAvgBuffer[bufferSize] = percentage;
+	percAvgBuffer[bSize - 1] = percentage;
 	float percentFiltered;
-	for(int i = 0; i < bufferSize; i++){
-		percentFiltered += (percAvgBuffer[i])/((float)bufferSize);
+	for(int i = 0; i < bSize; i++){
+		percentFiltered += (percAvgBuffer[i])/(bSize);
 	}
 	return percentFiltered;
 }
@@ -1213,7 +1153,7 @@ void LCD_printFlt(float data) {
 
 void LCD_printFltDecLim(float data) {
   	char temp[16];
-	sprintf(temp, "%.1f", data);
+	sprintf(temp, "%.0f", data);
 	HD44780_PrintStr(temp);
 }
 
@@ -1246,5 +1186,4 @@ uint8_t readSDsendBT(UART_HandleTypeDef *huart2) {
 	f_close(&fil);
 	f_mount(NULL, "", 0);
 	return 1;
-
 }
